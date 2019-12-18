@@ -47,12 +47,13 @@ int main(int argc, char* argv[]) {
 	int aux;	
 	
 	contadorSolicitudes = 0;
-	logFile = NULL;	
 	solicitudes.sa_handler =  manejadoraSolicitudes;
 	terminar.sa_handler = manejadoraTerminar;
+
 	pthread_mutex_init(&mutexColaSolicitudes,NULL);
 	pthread_mutex_init(&mutexColaSocial,NULL);
 	pthread_mutex_init(&mutexLog,NULL);
+
 	pthread_create(&atendedorInvitacion, NULL, hiloAtendedores, "0");
 	pthread_create(&atendedorQR, NULL, hiloAtendedores, "1");
 	pthread_create(&atendedorPRO, NULL, hiloAtendedores, "2");
@@ -133,66 +134,69 @@ void manejadoraSolicitudes(int sig){
 
 
 
-void *hiloSolicitudes(void *solicitud) { 
-	printf("SIUUUUUUU PID=%d, SPID=%d\n", getpid(), gettid());
-pthread_mutex_lock(&cola);
-int posicion =*(int *)num;
-pthread_mutex_unlock(&cola);
-char * cad = malloc(12 * sizeof(char));
-char * cad1 = malloc(12 * sizeof(char));
+void *hiloSolicitudes(void *posSolicitud) { 
+	pthread_mutex_lock(&mutexColaSolicitudes);
+	int posicion =*(int *)posSolicitud;
+	pthread_mutex_unlock(&mutexColaSolicitudes);
 
-pthread_mutex_lock(&cola);
-int  n=solicitudes[posicion].id; //aqui creo que no debria haber mutex
-int n1=solicitudes[posicion].tipo;
-pthread_mutex_unlock(&cola);
-sprintf(cad, "%i", n);
-sprintf(cad1, "%i", n1);
-  pthread_mutex_lock(&fichero);  //voy a escribir en en el fichero por tanto mutex
-  writeLogMessage(cad, cad1);
-  pthread_mutex_unlock(&fichero);
+	char * cad = malloc(12 * sizeof(char));
+	char * cad1 = malloc(12 * sizeof(char));
 
-while(1){
-sleep(4);
+	pthread_mutex_lock(&mutexColaSolicitudes);
+	int  n=solicitudes[posicion].id; 
+	int n1=solicitudes[posicion].tipo;
+	pthread_mutex_unlock(&mutexColaSolicitudes);
 
-   if(solicitudes[posicion].atendido==0){
-		printf("No esta siendo atendida %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
-		if(solicitudes[posicion].tipo==1){
-			printf("Es de invitacion %d\n", posicion);
-			if(calculaAleatorios(1, 100)<=10){
-				printf("La invitacion se canso\n");
-                                pthread_mutex_lock(&fichero);
-				writeLogMessage(cad, cad1);
-				pthread_mutex_unlock(&fichero);
- 				pthread_mutex_lock(&cola);
-				solicitudes[posicion].tipo=0;
-				solicitudes[posicion].id=0;
-				solicitudes[posicion].atendido=0;
-				pthread_mutex_unlock(&cola);
-				pthread_exit(NULL);
-			}
-			if(solicitudes[posicion].atendido==1){
-				printf("Esta siendo atendida\n");
+	sprintf(cad, "%d", n);
+	sprintf(cad1, "%d", n1);
+
+  	pthread_mutex_lock(&mutexLog);  //voy a escribir en en el fichero por tanto mutex
+  	writeLogMessage(cad, cad1);
+  	pthread_mutex_unlock(&mutexLog);
+
+	sleep(4);
+
+	while(colaSolicitudes[posSolicitud].atendido == 0) {
+
+   		if(solicitudes[posicion].atendido==0){
+			printf("No esta siendo atendida %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
+			if(solicitudes[posicion].tipo==1){
+				printf("Es de invitacion %d\n", posicion);
+				if(calculaAleatorios(1, 100)<=10){
+					printf("La invitacion se canso\n");
+                	                pthread_mutex_lock(&fichero);
+					writeLogMessage(cad, cad1);
+					pthread_mutex_unlock(&fichero);
+ 					pthread_mutex_lock(&cola);
+					solicitudes[posicion].tipo=0;
+					solicitudes[posicion].id=0;
+					solicitudes[posicion].atendido=0;
+					pthread_mutex_unlock(&cola);
+					pthread_exit(NULL);
+				}
+				if(solicitudes[posicion].atendido==1){
+					printf("Esta siendo atendida\n");
+					
+				}
 				
 			}
-			
-		}
-		if(solicitudes[posicion].tipo==2){
-			printf("Es de QR  %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
-			if(calculaAleatorios(1, 100)<=30){
-				printf("La invitacion se rechazo\n");
- 				pthread_mutex_lock(&fichero);
-				writeLogMessage(cad, cad1);
-				pthread_mutex_unlock(&fichero);
-				pthread_mutex_lock(&cola);
-				solicitudes[posicion].tipo=0;
-				solicitudes[posicion].id=0;
-				solicitudes[posicion].atendido=0;
-				pthread_mutex_unlock(&cola);
-				pthread_exit(NULL);
-				
+			if(solicitudes[posicion].tipo==2){
+				printf("Es de QR  %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
+				if(calculaAleatorios(1, 100)<=30){
+					printf("La invitacion se rechazo\n");
+ 					pthread_mutex_lock(&fichero);
+					writeLogMessage(cad, cad1);
+					pthread_mutex_unlock(&fichero);
+					pthread_mutex_lock(&cola);
+					solicitudes[posicion].tipo=0;
+					solicitudes[posicion].id=0;
+					solicitudes[posicion].atendido=0;
+					pthread_mutex_unlock(&cola);
+					pthread_exit(NULL);
+					
+				}
 			}
-		}
-		if(calculaAleatorios(1, 100)<=15){
+			if(calculaAleatorios(1, 100)<=15){
 				printf("La invitacion se rechazo porque no es fiable\n");
 				pthread_mutex_lock(&fichero);
 				writeLogMessage(cad, cad1);
@@ -204,12 +208,11 @@ sleep(4);
 				pthread_mutex_unlock(&cola);
 				pthread_exit(NULL);
 			}                
+		}else if(solicitudes[posicion].atendido==1){
+			break;		
+		}
 
-	}else if(solicitudes[posicion].atendido==1){
-		
 	}
-
-}
 }
 
 
