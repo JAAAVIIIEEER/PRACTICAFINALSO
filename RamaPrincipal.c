@@ -1,223 +1,252 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <signal.h>
-#include <unistd.h>
-#include <errno.h>
-#include <time.h>
+#include <stdio.h> 
+#include <stdlib.h> 
 #include <pthread.h> 
+#include <sys/types.h> 
+#include <sys/syscall.h> 
+#include <errno.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
 
-// DECLARACIÓN VARIABLES GLOBALES
+//prototipos 
+void *AccionesSolicitud(void *num);
+void manejadora_solicitudes(int sig);
+void manejadora_terminar(int sig);
+void nuevaSolicitud(int sig);
+void writeLogMessage(char *id, char *msg);
+pid_t gettid(void);
+int calculaAleatorios(int min, int max);
+void *AccionesAtendedor(void *num);
+void solicitudRechazada(char *cad, char *cad1, int posicion);
+
+int contadorSolicitud;
 pthread_mutex_t mutexColaSolicitudes;
-pthread_mutex_t mutexColaSocial;
-pthread_mutex_t mutexLog;
+pthread_mutex_t mutexLog; 
+pthread_mutex_t atendedore;
 
-typedef struct {
-	int id;
-	int atendido;
-	int tipo;
-	pthread_t hilo;
-} Solicitud;
+
+typedef struct{
+ int id; 
+ int atendido; 
+ int tipo; 
+ int hilo;
+}solicitud;
+
+solicitud solicitudes[15];
 
 typedef struct{
   int atendiendo;
   int tipo;
-} Atendedor;
+}atendedor;
 
-Atendedor atendedores[3]
-Solicitud colaSolicitudes[15];
-Solicitud colaSocial[4];
+atendedor atendedores[3];
 
-FILE * logFile;
-int contadorSolicitudes;
+typedef struct{
+ int id; 
+ int atendido; 
+ int tipo; 
+}usuario;
 
-void manejadoraSolicitudes(int sig);
-void manejadoraTerminar(int sig);
-void *hiloSolicitudes(void *solicitud);
-void *hiloAtendedores(void *tipo);
-int isEspacioEnColaSolicitudes();
-int calculaAleatorios(int min, int max);
-pid_t gettid(void);
+usuario usuarios[4];
 
-int main(int argc, char* argv[]) {
-	pthread_t atendedorQR, atendedorInvitacion, atendedorPRO, coordinador;
-	struct sigaction solicitudes = {0};
-	struct sigaction terminar = {0};
-	int aux;	
-	
-	contadorSolicitudes = 0;
-	solicitudes.sa_handler =  manejadoraSolicitudes;
-	terminar.sa_handler = manejadoraTerminar;
+FILE *logFile;
 
-	pthread_mutex_init(&mutexColaSolicitudes,NULL);
-	pthread_mutex_init(&mutexColaSocial,NULL);
-	pthread_mutex_init(&mutexLog,NULL);
 
-	pthread_create(&atendedorInvitacion, NULL, hiloAtendedores, "0");
-	pthread_create(&atendedorQR, NULL, hiloAtendedores, "1");
-	pthread_create(&atendedorPRO, NULL, hiloAtendedores, "2");
+void manejadora_solicitudes(int sig){
+  
+  nuevaSolicitud(sig);
 
-	for(aux = 0; aux < 15; aux++) {
-		colaSolicitudes[aux].id = 0;
-		colaSolicitudes[aux].atendido = 0;
-		colaSolicitudes[aux].tipo = 0;
-	}
-
-	if(-1 == sigaction(SIGUSR2,&solicitudes,NULL)) {
-		perror("Error en el sigaction que recoge la señal SIGUSR2.");
-		exit(-1);
-	}	 
-	if(-1 == sigaction(SIGUSR1,&solicitudes,NULL)) {
-		perror("Error en el sigaction que recoge la señal SIGUSR1.");
-		exit(-1);
-	}
-	if(-1 == sigaction(SIGINT,&terminar,NULL)) {
-		perror("Error en el sigaction que recoge la señal SIGINT.");
-		exit(-1);
-	}
-	while(contadorSolicitudes != -1) {
-		pause();
-	}
-
-	exit(0);
-	
 }
 
-int isEspacioEnColaSolicitudes() {
-	int aux;
-	for(aux = 0; aux < 15; aux++) {
-		if(colaSolicitudes[aux].id == 0) {
-			return aux;
-		}
-	}
-	return -1;
+void manejadora_terminar(int sig){
+
+ printf("Acabando programa\n");
+   pthread_mutex_lock(&mutexColaSolicitudes);
+   contadorSolicitud = -1;
+   pthread_mutex_unlock(&mutexColaSolicitudes);
+
 }
 
-int isColaLLena(int tipo) {
-	int aux;
+int main(){
+   solicitud s;
+   atendedor a;
+   int aux;	
+   fopen("hola.log", "w"); 
+
+   struct sigaction solicitudesSen = {0};
+   solicitudesSen.sa_handler=manejadora_solicitudes;
+   struct sigaction terminar = {0};
+   terminar.sa_handler=manejadora_terminar;
+
+    sigaction(SIGUSR1, &solicitudesSen, NULL);
+    sigaction(SIGUSR2, &solicitudesSen, NULL);
+    sigaction(SIGINT, &terminar, NULL);
+    
+    if (pthread_mutex_init(&mutexColaSolicitudes, NULL)!=0){
+ 	exit(-1);
+ 	}
+   if (pthread_mutex_init(&mutexLog, NULL)!=0){
+ 	exit(-1);
+	} 
+   if (pthread_mutex_init(&atendedore, NULL)!=0){
+ 	exit(-1);
+	}
+    pthread_cond_t no_lleno;
+    pthread_cond_init(&no_lleno, NULL);
+
+    contadorSolicitud=0;
+   
 	for(aux = 0; aux < 15; aux++) {
-		if(colaSolicitudes[aux].tipo == tipo || tipo == 2) {
-			if(colaSolicitudes[aux].atendido == 0) {
-				return aux;
+		solicitudes[aux].id = 0;
+		solicitudes[aux].atendido = 0;
+		solicitudes[aux].tipo = 0;
+	}
+
+	for(aux = 0; aux < 3; aux++) {
+		atendedores[aux].atendiendo=0;
+    		atendedores[aux].tipo=0;
+	}
+  
+
+    pthread_t atendedor1, atendedor2, atendedor3; 
+    int inv=1, qr=2, both=3;
+
+    pthread_create(&atendedor1, NULL, AccionesAtendedor, (void*)&inv);
+    pthread_create(&atendedor2, NULL, AccionesAtendedor, (void*)&qr);
+    pthread_create(&atendedor3, NULL, AccionesAtendedor, (void*)&both);
+
+
+   pthread_mutex_lock(&mutexColaSolicitudes); 
+   while(contadorSolicitud != -1){
+   pthread_mutex_unlock(&mutexColaSolicitudes);
+      pause();
+
+    }
+
+//terminar todas las solicitudes que hay en la cola
+
+}
+
+
+void nuevaSolicitud(int sig){
+     pthread_mutex_lock(&mutexColaSolicitudes);
+     int i=0;
+  
+     while(solicitudes[i].id!=0){
+      	i++;
+      	//si llega al final de la cola se para el bucle
+      if(i==15){
+	break;
+	}
+    }
+    printf("El numero %d\n", i);
+
+    //se ignora la llamada
+     if(i==15){
+         printf("Se ignora la llamada\n");
+        
+       }else{
+     
+      contadorSolicitud=contadorSolicitud+1;
+      solicitudes[i].id=contadorSolicitud;
+      solicitudes[i].atendido=0;
+      if(sig==SIGUSR1){
+	printf("Invitacion inv\n");
+        solicitudes[i].tipo=1;
+      }else if(sig==SIGUSR2){
+	printf("Invitacion qr\n");
+        solicitudes[i].tipo=2;
+      }
+       pthread_t solicitud;
+       pthread_create(&solicitud, NULL, AccionesSolicitud, (void*)&i);
+
+    }
+
+    for(int j=0; j<15; j++){
+      printf("El id es: %d\n", solicitudes[j].id);
+     }
+	pthread_mutex_unlock(&mutexColaSolicitudes);
+   
+}
+
+
+pid_t gettid(void) {
+   return syscall(__NR_gettid);
+ } 
+
+
+void *AccionesSolicitud(void *id){
+
+printf("SIUUUUUUU PID=%d, SPID=%d\n", getpid(), gettid());
+pthread_mutex_lock(&mutexColaSolicitudes);
+int posicion =*(int *)id;
+pthread_mutex_unlock(&mutexColaSolicitudes);
+char * cad = malloc(12 * sizeof(char));
+char * cad1 = malloc(12 * sizeof(char));
+
+pthread_mutex_lock(&mutexColaSolicitudes);
+int  n=solicitudes[posicion].id; //mutex porque puede ser modificado por un atendedor
+int n1=solicitudes[posicion].tipo;
+pthread_mutex_unlock(&mutexColaSolicitudes);
+sprintf(cad, "%d", n);
+sprintf(cad1, "%d", n1);
+  pthread_mutex_lock(&mutexLog);  //voy a escribir en en el fichero por tanto mutex
+  writeLogMessage(cad, cad1);
+  pthread_mutex_unlock(&mutexLog);
+
+while(1){
+sleep(4);
+
+   if(solicitudes[posicion].atendido==0){
+		printf("No esta siendo atendida %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
+		if(solicitudes[posicion].tipo==1){
+			printf("Es de invitacion %d\n", posicion);
+			if(calculaAleatorios(1, 100)<=10){
+				printf("La invitacion se canso\n");
+                         	solicitudRechazada(cad, cad1, posicion);
 			}
+			
+			
 		}
-	}	
-	return -1;					
-	
-}
+		if(solicitudes[posicion].tipo==2){
+			printf("Es de QR  %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
+			if(calculaAleatorios(1, 100)<=30){
+				printf("La invitacion se rechazo\n");
+ 				solicitudRechazada(cad, cad1, posicion);
 
-void manejadoraTerminar(int sig) {
-	contadorSolicitudes = -1;
-}
-
-void manejadoraSolicitudes(int sig){
-	pthread_mutex_lock(&mutexColaSolicitudes);
-	int posEspacioVacio = isEspacioEnColaSolicitudes();
-
-	// SI COLA LLENA, SE SALE Y LIBERA MUTEX DE COLA SOLICITUDES, SINO, HACE TODO EL PROCEDIMIENTO
-	if(posEspacioVacio != -1) {
-		pthread_t hiloSolicitud;
-		contadorSolicitudes++;
-		colaSolicitudes[posEspacioVacio].id = contadorSolicitudes;
-		if(sig == SIGUSR1){
-			colaSolicitudes[posEspacioVacio].tipo = 1; 
-		} else {
-			colaSolicitudes[posEspacioVacio].tipo = 2; 
-		}
-		colaSolicitudes[posEspacioVacio].hilo = hiloSolicitud;
-		pthread_create(&hiloSolicitud, NULL, hiloSolicitudes, (void *)&posEspacioVacio);   
-		
-	}
-	pthread_mutex_unlock(&mutexColaSolicitudes);
-}
-
-
-
-void *hiloSolicitudes(void *posSolicitud) { 
-	pthread_mutex_lock(&mutexColaSolicitudes);
-	int posicion =*(int *)posSolicitud;
-	pthread_mutex_unlock(&mutexColaSolicitudes);
-
-	char * cad = malloc(12 * sizeof(char));
-	char * cad1 = malloc(12 * sizeof(char));
-
-	pthread_mutex_lock(&mutexColaSolicitudes);
-	int  n=solicitudes[posicion].id; 
-	int n1=solicitudes[posicion].tipo;
-	pthread_mutex_unlock(&mutexColaSolicitudes);
-
-	sprintf(cad, "%d", n);
-	sprintf(cad1, "%d", n1);
-
-  	pthread_mutex_lock(&mutexLog);  //voy a escribir en en el fichero por tanto mutex
-  	writeLogMessage(cad, cad1);
-  	pthread_mutex_unlock(&mutexLog);
-
-	sleep(4);
-
-	while(colaSolicitudes[posSolicitud].atendido == 0) {
-
-   		if(solicitudes[posicion].atendido==0){
-			printf("No esta siendo atendida %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
-			if(solicitudes[posicion].tipo==1){
-				printf("Es de invitacion %d\n", posicion);
-				if(calculaAleatorios(1, 100)<=10){
-					printf("La invitacion se canso\n");
-                	                pthread_mutex_lock(&fichero);
-					writeLogMessage(cad, cad1);
-					pthread_mutex_unlock(&fichero);
- 					pthread_mutex_lock(&cola);
-					solicitudes[posicion].tipo=0;
-					solicitudes[posicion].id=0;
-					solicitudes[posicion].atendido=0;
-					pthread_mutex_unlock(&cola);
-					pthread_exit(NULL);
-				}
-				if(solicitudes[posicion].atendido==1){
-					printf("Esta siendo atendida\n");
-					
-				}
 				
 			}
-			if(solicitudes[posicion].tipo==2){
-				printf("Es de QR  %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
-				if(calculaAleatorios(1, 100)<=30){
-					printf("La invitacion se rechazo\n");
- 					pthread_mutex_lock(&fichero);
-					writeLogMessage(cad, cad1);
-					pthread_mutex_unlock(&fichero);
-					pthread_mutex_lock(&cola);
-					solicitudes[posicion].tipo=0;
-					solicitudes[posicion].id=0;
-					solicitudes[posicion].atendido=0;
-					pthread_mutex_unlock(&cola);
-					pthread_exit(NULL);
-					
-				}
-			}
-			if(calculaAleatorios(1, 100)<=15){
-				printf("La invitacion se rechazo porque no es fiable\n");
-				pthread_mutex_lock(&fichero);
-				writeLogMessage(cad, cad1);
-				pthread_mutex_unlock(&fichero);
-				pthread_mutex_lock(&cola);
-				solicitudes[posicion].tipo=0;
-				solicitudes[posicion].id=0;
-				solicitudes[posicion].atendido=0;
-				pthread_mutex_unlock(&cola);
-				pthread_exit(NULL);
-			}                
-		}else if(solicitudes[posicion].atendido==1){
-			break;		
 		}
+		if(calculaAleatorios(1, 100)<=15){
+				printf("La invitacion se rechazo porque no es fiable\n");
+				solicitudRechazada(cad, cad1, posicion);
 
+			}                
+
+	}else if(solicitudes[posicion].atendido==1){
+		
 	}
+
 }
 
+  }
 
-void *hiloAtendedores(void *tipo) { 
-	int i;
+void solicitudRechazada(char *cad, char *cad1, int posicion){
+  pthread_mutex_lock(&mutexLog);
+  writeLogMessage(cad, cad1);
+  pthread_mutex_unlock(&mutexLog);
+  pthread_mutex_lock(&mutexColaSolicitudes);
+  solicitudes[posicion].tipo=0;
+  solicitudes[posicion].id=0;
+  solicitudes[posicion].atendido=0;
+  pthread_mutex_unlock(&mutexColaSolicitudes);
+  pthread_exit(NULL);
+
+  }
+
+
+void *AccionesAtendedor(void *num){
+        int i;
 	pthread_mutex_lock(&atendedore);
 	int posicion=*(int *)num;
 	pthread_mutex_unlock(&atendedore);
@@ -228,9 +257,8 @@ void *hiloAtendedores(void *tipo) {
 		int mayor=1600;
 		int valor=0;
 		//busca en la cola de solicitudes
-		pthread_mutex_lock(&cola);
+		pthread_mutex_lock(&mutexColaSolicitudes);
                 for(i=0; i<15; i++){
-//duda como es posible que se puedan atender 3 solicitudes a la vez si solo podemos acceder a la cola de uno en uno??
 			if(solicitudes[i].tipo==1){
 				if(solicitudes[i].id<mayor && solicitudes[i].id!=0){
 					mayor=solicitudes[i].id;
@@ -238,9 +266,9 @@ void *hiloAtendedores(void *tipo) {
 				}	
 			}
 			solicitudes[valor].atendido=1;
-		/*	pthread_mutex_lock(&fichero);
+		/*	pthread_mutex_lock(&mutexLog);
 			writeLogMessage(cad, cad1);
-			pthread_mutex_unlock(&fichero);*/
+			pthread_mutex_unlock(&mutexLog);*/
 		}
 		if(mayor==1600){
 			printf("No encontro de su tipo\n");
@@ -252,7 +280,7 @@ void *hiloAtendedores(void *tipo) {
 			    }
 			solicitudes[valor].atendido=1;
 		}
-		pthread_mutex_unlock(&cola);
+		pthread_mutex_unlock(&mutexColaSolicitudes);
 		if(mayor==1600){
 			
 			sleep(1);
@@ -269,10 +297,10 @@ void *hiloAtendedores(void *tipo) {
 				printf("La solicitud esta siendo atendida con antecedentes\n");
 				sleep(calculaAleatorios(6, 10));
 			}
-			pthread_mutex_lock(&cola);
+			pthread_mutex_lock(&mutexColaSolicitudes);
 			solicitudes[valor].atendido=0;
 			//
-			pthread_mutex_unlock(&cola);
+			pthread_mutex_unlock(&mutexColaSolicitudes);
 		}
 		
 		
@@ -291,14 +319,20 @@ void *hiloAtendedores(void *tipo) {
 }
 
 
-void writeLogMessage(char *id, char *msg) { 
-	// Calculamos la hora actual 
-	time_t now = time(0); 
-	struct tm *tlocal = localtime(&now);
-	char stnow[19]; 
-	strftime(stnow, 19, "%d/%m/%y %H:%M:%S", tlocal); 
-	// Escribimos en el log 
-	logFile = fopen("hola.log", "a"); 
-	fprintf(logFile, "[%s] %s: %s\n", stnow, id, msg); 
-	fclose(logFile); 
+int calculaAleatorios(int min, int max) {
+	return rand() % (max-min+1) + min;	
 }
+
+
+
+void writeLogMessage(char *id, char *msg) { 
+// Calculamos la hora actual
+ time_t now = time(0);
+ struct tm *tlocal = localtime(&now);
+ char stnow[19];
+ strftime(stnow, 19, "%d/%m/%y %H:%M:%S", tlocal);
+ // Escribimos en el log 
+ logFile = fopen("hola.log", "a");
+ fprintf(logFile, "[%s] %s: %s\n", stnow, id, msg);
+ fclose(logFile);
+ }
