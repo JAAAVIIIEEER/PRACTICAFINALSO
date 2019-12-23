@@ -18,11 +18,14 @@ pid_t gettid(void);
 int calculaAleatorios(int min, int max);
 void *AccionesAtendedor(void *num);
 void solicitudRechazada(char *cad, char *cad1, int posicion);
+void *actividadCultural();
 
 int contadorSolicitud;
+int contadorActividades;
 pthread_mutex_t mutexColaSolicitudes;
 pthread_mutex_t mutexLog; 
 pthread_mutex_t atendedore;
+pthread_cond_t cond;
 
 
 typedef struct{
@@ -68,33 +71,33 @@ void manejadora_terminar(int sig){
 }
 
 int main(){
-   solicitud s;
-   atendedor a;
-   int aux;	
-   fopen("hola.log", "w"); 
+   	solicitud s;
+   	atendedor a;
+   	int aux;	
+   	fopen("hola.log", "w"); 
 
-   struct sigaction solicitudesSen = {0};
-   solicitudesSen.sa_handler=manejadora_solicitudes;
-   struct sigaction terminar = {0};
-   terminar.sa_handler=manejadora_terminar;
+   	struct sigaction solicitudesSen = {0};
+   	solicitudesSen.sa_handler=manejadora_solicitudes;
+   	struct sigaction terminar = {0};
+   	terminar.sa_handler=manejadora_terminar;
 
-    sigaction(SIGUSR1, &solicitudesSen, NULL);
-    sigaction(SIGUSR2, &solicitudesSen, NULL);
-    sigaction(SIGINT, &terminar, NULL);
+    	sigaction(SIGUSR1, &solicitudesSen, NULL);
+    	sigaction(SIGUSR2, &solicitudesSen, NULL);
+    	sigaction(SIGINT, &terminar, NULL);
     
-    if (pthread_mutex_init(&mutexColaSolicitudes, NULL)!=0){
- 	exit(-1);
+    	if (pthread_mutex_init(&mutexColaSolicitudes, NULL)!=0){
+ 		exit(-1);
  	}
-   if (pthread_mutex_init(&mutexLog, NULL)!=0){
- 	exit(-1);
+   	if (pthread_mutex_init(&mutexLog, NULL)!=0){
+ 		exit(-1);
 	} 
-   if (pthread_mutex_init(&atendedore, NULL)!=0){
- 	exit(-1);
+  	if (pthread_mutex_init(&atendedore, NULL)!=0){
+ 		exit(-1);
 	}
-    pthread_cond_t no_lleno;
-    pthread_cond_init(&no_lleno, NULL);
+    	contadorSolicitud=0;
+	contadorActividades=0;
 
-    contadorSolicitud=0;
+	if(pthread_cond_init(&cond, NULL)!=0) exit(-1);
    
 	for(aux = 0; aux < 15; aux++) {
 		solicitudes[aux].id = 0;
@@ -176,28 +179,33 @@ pid_t gettid(void) {
 
 
 void *AccionesSolicitud(void *id){
+	printf("SIUUUUUUU PID=%d, SPID=%d\n", getpid(), gettid());
+	pthread_mutex_lock(&mutexColaSolicitudes);
+	int posicion =*(int *)id;
+	pthread_mutex_unlock(&mutexColaSolicitudes);
+	char * cad = malloc(30 * sizeof(char));
+	char * cad1 = malloc(30 * sizeof(char));
+	pthread_mutex_lock(&mutexColaSolicitudes);
+	int  n=solicitudes[posicion].id; //mutex porque puede ser modificado por un atendedor
+	int n1=solicitudes[posicion].tipo;
+	pthread_mutex_unlock(&mutexColaSolicitudes);
+	sprintf(cad, "Solicitud %d", n);
+	sprintf(cad1, "Aniadida");
+	pthread_mutex_lock(&mutexLog);  //voy a escribir en en el fichero por tanto mutex
+	writeLogMessage(cad, cad1);
+	pthread_mutex_unlock(&mutexLog);
+	if(n1==1){
+		sprintf(cad1, "Tipo: Invitación");
+	} else {
+		sprintf(cad1, "Tipo: QR");
+	}
+	pthread_mutex_lock(&mutexLog);  //voy a escribir en en el fichero por tanto mutex
+	writeLogMessage(cad, cad1);
+	pthread_mutex_unlock(&mutexLog);
 
-printf("SIUUUUUUU PID=%d, SPID=%d\n", getpid(), gettid());
-pthread_mutex_lock(&mutexColaSolicitudes);
-int posicion =*(int *)id;
-pthread_mutex_unlock(&mutexColaSolicitudes);
-char * cad = malloc(12 * sizeof(char));
-char * cad1 = malloc(12 * sizeof(char));
-
-pthread_mutex_lock(&mutexColaSolicitudes);
-int  n=solicitudes[posicion].id; //mutex porque puede ser modificado por un atendedor
-int n1=solicitudes[posicion].tipo;
-pthread_mutex_unlock(&mutexColaSolicitudes);
-sprintf(cad, "%d", n);
-sprintf(cad1, "%d", n1);
-  pthread_mutex_lock(&mutexLog);  //voy a escribir en en el fichero por tanto mutex
-  writeLogMessage(cad, cad1);
-  pthread_mutex_unlock(&mutexLog);
-
-while(1){
-sleep(4);
-
-   if(solicitudes[posicion].atendido==0){
+	while(1){
+		sleep(4);
+   		if(solicitudes[posicion].atendido==0){
 		printf("No esta siendo atendida %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
 		if(solicitudes[posicion].tipo==1){
 			printf("Es de invitacion %d\n", posicion);
@@ -232,17 +240,17 @@ sleep(4);
   }
 
 void solicitudRechazada(char *cad, char *cad1, int posicion){
-  pthread_mutex_lock(&mutexLog);
-  writeLogMessage(cad, cad1);
-  pthread_mutex_unlock(&mutexLog);
-  pthread_mutex_lock(&mutexColaSolicitudes);
-  solicitudes[posicion].tipo=0;
-  solicitudes[posicion].id=0;
-  solicitudes[posicion].atendido=0;
-  pthread_mutex_unlock(&mutexColaSolicitudes);
-  pthread_exit(NULL);
-
-  }
+	sprintf(cad1, "Rechazada");
+	pthread_mutex_lock(&mutexLog);
+	writeLogMessage(cad, cad1);
+	pthread_mutex_unlock(&mutexLog);
+  	pthread_mutex_lock(&mutexColaSolicitudes);
+  	solicitudes[posicion].tipo=0;
+  	solicitudes[posicion].id=0;
+  	solicitudes[posicion].atendido=0;
+  	pthread_mutex_unlock(&mutexColaSolicitudes);
+  	pthread_exit(NULL);
+}
 
 
 void *AccionesAtendedor(void *num){
@@ -250,6 +258,10 @@ void *AccionesAtendedor(void *num){
 	pthread_mutex_lock(&atendedore);
 	int posicion=*(int *)num;
 	pthread_mutex_unlock(&atendedore);
+	char * cad = malloc(30 * sizeof(char));
+	char * cad1 = malloc(30 * sizeof(char));
+	sprintf(cad, "Atendedor %d", posicion);
+	sprintf(cad1, "Atendiendo");
 	if(posicion==1){
 	   while(1){
 		printf("Es el atendedor de solicitudes invitacion %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
@@ -266,9 +278,6 @@ void *AccionesAtendedor(void *num){
 				}	
 			}
 			solicitudes[valor].atendido=1;
-		/*	pthread_mutex_lock(&mutexLog);
-			writeLogMessage(cad, cad1);
-			pthread_mutex_unlock(&mutexLog);*/
 		}
 		if(mayor==1600){
 			printf("No encontro de su tipo\n");
@@ -286,36 +295,73 @@ void *AccionesAtendedor(void *num){
 			sleep(1);
 					
 		}else{
+			pthread_mutex_lock(&mutexLog); 
+			writeLogMessage(cad, cad1);
+			pthread_mutex_unlock(&mutexLog);
 			int porcentaje=calculaAleatorios(1, 100);
 			if(porcentaje<=70){
 				printf("La solicitud esta siendo atendida correctamente\n");	
 				sleep(calculaAleatorios(1, 4));
+				sprintf(cad1, "Fin atención sin errores");
+				pthread_mutex_lock(&mutexLog); 
+				writeLogMessage(cad, cad1);
+				pthread_mutex_unlock(&mutexLog);
 			}else if(porcentaje<=90){
 				printf("La solicitud esta siendo atendida con errores\n");
 				sleep(calculaAleatorios(2, 6));
+				sprintf(cad1, "Fin atención por errores");
+				pthread_mutex_lock(&mutexLog); 
+				writeLogMessage(cad, cad1);
+				pthread_mutex_unlock(&mutexLog);
 			}else if(porcentaje<=100){
 				printf("La solicitud esta siendo atendida con antecedentes\n");
 				sleep(calculaAleatorios(6, 10));
+				sprintf(cad1, "Fin atención por antecedentes");
+				pthread_mutex_lock(&mutexLog); 
+				writeLogMessage(cad, cad1);
+				pthread_mutex_unlock(&mutexLog);
 			}
 			pthread_mutex_lock(&mutexColaSolicitudes);
 			solicitudes[valor].atendido=0;
-			//
 			pthread_mutex_unlock(&mutexColaSolicitudes);
 		}
 		
 		
 
-          }
-	
-		
+          }	
 	}else if(posicion==2){
 		printf("Es el atendedor de solicitudes qr %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
 		atendedores[posicion-1].tipo=2;
 	
-	}else if(posicion==3){
+	}else{
 		printf("Es el atendedor PRO %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
 		atendedores[posicion-1].tipo=3;
 	}
+}
+
+
+void *accionesCoordinador(){
+	pthread_t nuevoHilo;
+	pthread_mutex_lock(&atendedore);
+	while(contadorActividades!=4){
+		pthread_cond_wait(&cond, &atendedore);
+	}	
+	pthread_mutex_lock(&mutexLog);
+	writeLogMessage("Actividad", "Actividad comenzando");
+	pthread_mutex_unlock(&mutexLog);
+	for(int i=0; i<4;i++){
+		pthread_create(&nuevoHilo, NULL, actividadCultural, NULL);
+	}
+	pthread_mutex_lock(&mutexLog);
+	writeLogMessage("Actividad", "Actividad finalizando");
+	pthread_mutex_unlock(&mutexLog);
+	contadorActividades=0;
+	pthread_mutex_unlock(&atendedore);
+}
+
+void *actividadCultural(){
+	sleep(3);
+	pthread_exit(0);
 }
 
 
@@ -326,13 +372,14 @@ int calculaAleatorios(int min, int max) {
 
 
 void writeLogMessage(char *id, char *msg) { 
-// Calculamos la hora actual
- time_t now = time(0);
- struct tm *tlocal = localtime(&now);
- char stnow[19];
- strftime(stnow, 19, "%d/%m/%y %H:%M:%S", tlocal);
- // Escribimos en el log 
- logFile = fopen("hola.log", "a");
- fprintf(logFile, "[%s] %s: %s\n", stnow, id, msg);
- fclose(logFile);
- }
+	// Calculamos la hora actual
+	time_t now = time(0);
+	struct tm *tlocal = localtime(&now);
+	char stnow[19];
+	strftime(stnow, 19, "%d/%m/%y %H:%M:%S", tlocal);
+	// Escribimos en el log 
+	logFile = fopen("hola.log", "a");
+	fprintf(logFile, "[%s] %s: %s\n", stnow, id, msg);
+	fclose(logFile);
+}
+
