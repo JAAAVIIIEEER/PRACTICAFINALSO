@@ -229,7 +229,7 @@ void *AccionesSolicitud(void *id){
 				solicitudRechazada(cad, cad1, posicion);
 			}                
 			//pthread_mutex_lock(&mutexColaSolicitudes);
-		}else if(solicitudes[posicion].atendido==1){
+		}else{
 			//pthread_mutex_unlock(&mutexColaSolicitudes);
 			while(solicitudes[posicion].atendido==1){
 				sleep(1);	
@@ -286,7 +286,8 @@ void *AccionesAtendedor(void *num){
 		if(tipo==1){
 			int valor = algoAtendedores(tipo);
 			if(valor==-1){
-				sleep(1);				
+				sleep(1);
+				
 			}else{
 				int tiempo = tiempoAtencion(cad1);
 				pthread_mutex_lock(&atendedore);
@@ -310,11 +311,7 @@ void *AccionesAtendedor(void *num){
 					printf("El atendedor de Invitaciones descansa\n");
 					sleep(10);			
 				}		
-			}
-		
-	
-
-          	
+			}      	
 		}else if(tipo==2){			
 			int valor = algoAtendedores(tipo);
 			if(valor==-1){		
@@ -340,19 +337,15 @@ void *AccionesAtendedor(void *num){
 				contadorVecesAtiende=contadorVecesAtiende+1;
 
 				if(contadorVecesAtiende==5){
-					printf("El atendedor de qr descansa\n");
 					sleep(10);			
 				}
 			}
-          
 		}else{
-			printf("Es el atendedor PRO %d PID=%d, SPID=%d\n", tipo , getpid(), gettid());
 			int valor = algoAtendedores(tipo);
 			if(valor==-1){
 				sleep(1);			
 			}else{
 				int tiempo = tiempoAtencion(cad1);
-				printf("Holaaaaa\n");
 				pthread_mutex_lock(&atendedore);
   				pthread_mutex_lock(&mutexColaSolicitudes);
 				solicitudes[valor].atendido=1;
@@ -371,7 +364,6 @@ void *AccionesAtendedor(void *num){
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				contadorVecesAtiende=contadorVecesAtiende+1;
 				if(contadorVecesAtiende==5){
-					printf("El atendedor pro descansa\n");
 					sleep(10);			
 				}		
 			}	
