@@ -177,7 +177,6 @@ pid_t gettid(void) {
 
 
 void *AccionesSolicitud(void *id){
-	//printf("SIUUUUUUU PID=%d, SPID=%d\n", getpid(), gettid());
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	int posicion =*(int *)id;
 	pthread_mutex_unlock(&mutexColaSolicitudes);
@@ -237,7 +236,6 @@ void *AccionesSolicitud(void *id){
 				printf("Esta siendo atendida\n");
 
 			}
-			printf("Ha acado el atendedor\n");
 			solicitudTramitada(cad, cad1, posicion);
 			//esperar a que termine
 			//decide participar o no en una actividad social
@@ -288,11 +286,9 @@ void *AccionesAtendedor(void *num){
 		if(tipo==1){
 			int valor = algoAtendedores(tipo);
 			if(valor==-1){
-				sleep(1);
-					
+				sleep(1);				
 			}else{
 				int tiempo = tiempoAtencion(cad1);
-				printf("Holaaaaa\n");
 				pthread_mutex_lock(&atendedore);
   				pthread_mutex_lock(&mutexColaSolicitudes);
 				solicitudes[valor].atendido=1;
@@ -305,7 +301,7 @@ void *AccionesAtendedor(void *num){
 				sleep(tiempo);			
 				pthread_mutex_lock(&atendedore);
   				pthread_mutex_lock(&mutexColaSolicitudes);
-				solicitudes[valor].atendido=0;
+				solicitudes[valor].atendido=2;
 				atendedores[tipo-1].atendiendo=0;
 				pthread_mutex_unlock(&atendedore);
 				pthread_mutex_unlock(&mutexColaSolicitudes);
@@ -337,7 +333,7 @@ void *AccionesAtendedor(void *num){
 				sleep(tiempo);			
 				pthread_mutex_lock(&atendedore);
   				pthread_mutex_lock(&mutexColaSolicitudes);
-				solicitudes[valor].atendido=0;
+				solicitudes[valor].atendido=2;
 				atendedores[tipo-1].atendiendo=0;
 				pthread_mutex_unlock(&atendedore);
 				pthread_mutex_unlock(&mutexColaSolicitudes);
@@ -369,7 +365,7 @@ void *AccionesAtendedor(void *num){
 				sleep(tiempo);			
 				pthread_mutex_lock(&atendedore);
   				pthread_mutex_lock(&mutexColaSolicitudes);
-				solicitudes[valor].atendido=0;
+				solicitudes[valor].atendido=2;
 				atendedores[tipo-1].atendiendo=0;
 				pthread_mutex_unlock(&atendedore);
 				pthread_mutex_unlock(&mutexColaSolicitudes);
