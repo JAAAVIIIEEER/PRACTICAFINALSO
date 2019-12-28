@@ -71,7 +71,7 @@ void manejadora_solicitudes(int sig){
 
 void manejadora_terminar(int sig){
 
- printf("Acabando programa\n");
+ //printf("Acabando programa\n");
    pthread_mutex_lock(&mutexColaSolicitudes);
    contadorSolicitud = -1;
    pthread_mutex_unlock(&mutexColaSolicitudes);
@@ -125,12 +125,13 @@ int main(){
         }
 
 
-    	pthread_t atendedor1, atendedor2, atendedor3; 
+    	pthread_t atendedor1, atendedor2, atendedor3, coordinador; 
     	int inv=1, qr=2, both=3;
 
     	pthread_create(&atendedor1, NULL, AccionesAtendedor, (void*)&inv);
     	pthread_create(&atendedor2, NULL, AccionesAtendedor, (void*)&qr);
     	pthread_create(&atendedor3, NULL, AccionesAtendedor, (void*)&both);
+	pthread_create(&coordinador, NULL, accionesCoordinador, NULL);
 
 
    	pthread_mutex_lock(&mutexColaSolicitudes); 
@@ -155,19 +156,19 @@ void nuevaSolicitud(int sig){
 			break;
 		}
     	}
-    	printf("El numero %d\n", i);
+    	//printf("El numero %d\n", i);
 
     	//se ignora la llamada
      	if(i==15){
-         	printf("Se ignora la llamada\n");       
+         	//printf("Se ignora la llamada\n");       
 	}else{  
       		contadorSolicitud=contadorSolicitud+1;
       		solicitudes[i].id=contadorSolicitud;
       		if(sig==SIGUSR1){
-			printf("Invitacion inv\n");
+			//printf("Invitacion inv\n");
         		solicitudes[i].tipo=1;
       		}else if(sig==SIGUSR2){
-			printf("Invitacion qr\n");
+			//printf("Invitacion qr\n");
         		solicitudes[i].tipo=2;
      		}
        		pthread_t hiloSolicitud;
@@ -176,7 +177,7 @@ void nuevaSolicitud(int sig){
 
     	}
     	for(int j=0; j<15; j++){
-      		printf("El id es: %d\n", solicitudes[j].id);
+      		//printf("El id es: %d\n", solicitudes[j].id);
      	}
 	pthread_mutex_unlock(&mutexColaSolicitudes);   
 }
@@ -265,9 +266,10 @@ void *AccionesSolicitud(void *id){
 					pthread_mutex_lock(&mutexLog); 
 					writeLogMessage(cad, cad1);
 					pthread_mutex_unlock(&mutexLog);
-					printf("contadorActividades %d\n", contadorActividades);
+					printf("ContadorActividades %d\n", contadorActividades);
 					if(contadorActividades==4){
 						pthread_cond_signal(&cond);
+						printf("Hola coordinador\n");
 					}
 					pthread_mutex_unlock(&mutexColaSocial);
 
@@ -377,7 +379,7 @@ void *AccionesAtendedor(void *num){
 				contadorVecesAtiende=contadorVecesAtiende+1;
 				if(contadorVecesAtiende==5){
 					contadorVecesAtiende=0;
-					printf("El atendedor de Invitaciones descansa\n");
+					//printf("El atendedor de Invitaciones descansa\n");
 					pthread_mutex_lock(&mutexLog); 
 					sprintf(cad1, "Inicio descanso");
 					writeLogMessage(cad, cad1);
@@ -423,7 +425,7 @@ void *AccionesAtendedor(void *num){
 
 				if(contadorVecesAtiende==5){
 					contadorVecesAtiende=0;
-					printf("El atendedor de QR descansa\n");
+					//printf("El atendedor de QR descansa\n");
 					pthread_mutex_lock(&mutexLog); 
 					sprintf(cad1, "Inicio descanso");
 					writeLogMessage(cad, cad1);
@@ -469,7 +471,7 @@ void *AccionesAtendedor(void *num){
 				contadorVecesAtiende=contadorVecesAtiende+1;
 				if(contadorVecesAtiende==5){
 					contadorVecesAtiende=0;
-					printf("El atendedor PRO descansa\n");
+					//printf("El atendedor PRO descansa\n");
 					pthread_mutex_lock(&mutexLog); 
 					sprintf(cad1, "Inicio descanso");
 					writeLogMessage(cad, cad1);
@@ -552,19 +554,19 @@ int tiempoAtencion(char *cad1, int porcentaje){
 			
 			int tiempoAtendiendo;
 			if(porcentaje<=70){
-				printf("La solicitud esta siendo atendida correctamente\n");	
+				//printf("La solicitud esta siendo atendida correctamente\n");	
 				tiempoAtendiendo=(calculaAleatorios(1, 4));
 				sprintf(cad1, "Atención sin errores");
 				
 				//puede asociarse a una actividad cultural
 			}else if(porcentaje<=90){
-				printf("La solicitud esta siendo atendida con errores\n");
+				//printf("La solicitud esta siendo atendida con errores\n");
 				tiempoAtendiendo=(calculaAleatorios(2, 6));
 				sprintf(cad1, "Atención con errores");
 
 				//puede asociarse a una actividad cultural
 			}else if(porcentaje<=100){
-				printf("La solicitud esta siendo atendida con antecedentes\n");
+				//printf("La solicitud esta siendo atendida con antecedentes\n");
 				tiempoAtendiendo=(calculaAleatorios(6, 10));
 				sprintf(cad1, "Atención por antecedentes");
 				//liberaria hueco en la cola de solicitudes y se iria
@@ -578,23 +580,23 @@ void *accionesCoordinador(){
 	pthread_t nuevoHilo;
 	while(1){
 		pthread_mutex_lock(&mutexColaSocial);
-		//while(contadorActividades!=4){
-			pthread_cond_wait(&cond, &mutexColaSocial);
-	//	}	
+		printf("Esperando coordinador\n");
+		pthread_cond_wait(&cond, &mutexColaSocial);	
+		printf("Coordinador sigue\n");
 		pthread_mutex_lock(&mutexLog);
 		writeLogMessage("Actividad", "Actividad comenzando");
 		pthread_mutex_unlock(&mutexLog);
 		for(int i=0; i<4;i++){
 			pthread_create(&nuevoHilo, NULL, actividadCultural, (void*)&usuarios[i].id);
 		}
+		sleep(3);
 		pthread_mutex_lock(&mutexLog);
 		writeLogMessage("Actividad", "Actividad finalizando");
 		pthread_mutex_unlock(&mutexLog);
 		contadorActividades=0;
 		int aux;
 		for(aux = 0; aux < 3; aux++) {
-			usuarios[aux].id=0;
-             		
+			usuarios[aux].id=0;     		
        		}	
 		pthread_mutex_unlock(&mutexColaSocial);
 	}
