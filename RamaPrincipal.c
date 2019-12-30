@@ -253,8 +253,7 @@ void *AccionesSolicitud(void *id){
 				int actividad = calculaAleatorios(1, 2);
 				
 				if(actividad==1){
-					while(contadorActividades>4){
-
+					while(contadorActividades==4){
 						sleep(3);
 					}
 					//entra en la cola actividades
@@ -337,20 +336,14 @@ void *AccionesAtendedor(void *num){
 	int tipo=*(int *)num;
 	//pthread_mutex_unlock(&atendedore);
 	char * cad = malloc(80 * sizeof(char));
-	char * cad1 = malloc(80 * sizeof(char));
-	
-	
+	char * cad1 = malloc(80 * sizeof(char));	
     	while(1){
 		sprintf(cad, "Atendedor %d: ", tipo);
-		
 		if(tipo==1){
-			
 			int valor = algoAtendedores(tipo, cad);
 			if(valor==-1){
 				sleep(1);
-				
 			}else{
-
 				int porcentaje=calculaAleatorios(1, 100);
 				int flag = procedimiento(porcentaje);	
 				int tiempo = tiempoAtencion(cad1, porcentaje);
@@ -589,7 +582,7 @@ void *accionesCoordinador(){
 		for(int i=0; i<4;i++){
 			pthread_create(&nuevoHilo, NULL, actividadCultural, (void*)&usuarios[i].id);
 		}
-		sleep(3);
+		pthread_cond_wait(&cond, &mutexColaSocial);
 		pthread_mutex_lock(&mutexLog);
 		writeLogMessage("Actividad", "Actividad finalizando");
 		pthread_mutex_unlock(&mutexLog);
@@ -604,13 +597,28 @@ void *accionesCoordinador(){
 
 void *actividadCultural(void *id){
 	char * cad = malloc(80 * sizeof(char));
-	char * cad1 = malloc(80 * sizeof(char));	
+	char * cad1 = malloc(80 * sizeof(char));
+	int idAux=*(int *)id;
+	int i, contador=0;
 	sleep(3);
 	sprintf(cad1, "Fin Actividad");
-	sprintf(cad, "Solicitud %d", *(int *)id);
+	sprintf(cad, "Solicitud %d", idAux);
 	pthread_mutex_lock(&mutexLog); 
 	writeLogMessage(cad, cad1);
 	pthread_mutex_unlock(&mutexLog);
+	for(i=0; i<4;i++){
+		if(usuarios[i].id==idAux){
+			usuarios[i].id=0;
+		}
+	}
+	for(i=0; i<4;i++){
+		if(usuarios[i].id==0){
+			contador++;
+		}
+	}
+	if(contador==4){
+		pthread_cond_signal(&cond);
+	}
 	pthread_exit(0);
 }
 
