@@ -12,7 +12,7 @@ int main(){
 	char * cad1 = malloc(30 * sizeof(char));
 	printf("Introduce el pid: ");
 	scanf("%d",&pid);	
-	while(opciones!=5){
+	while(opciones!=8){
 		printf("Introduzca una opción: \n");
 		printf("	1.- SIGUSR1\n");
 		printf("	2.- SIGUSR2\n");
@@ -20,7 +20,8 @@ int main(){
 		printf("	4.- SIGUSR1+SIGUSR1\n");
 		printf("	5.- SIGUSR2+SIGUSR2\n");
 		printf("	6.- SIGINT\n");
-		printf("	7.- Salir\n");
+		printf("	7.- Modificar PID\n");
+		printf("	8.- Salir\n");
 		scanf("%d",&opciones);
 		switch(opciones){
 		case 1:
@@ -45,6 +46,10 @@ int main(){
 			kill(pid, SIGINT);
 			break;
 		case 7:
+			printf("Introduzca el nuevo PID: \n");
+			scanf("%d", &pid);
+			break;
+		case 8:
 			return 0;
 		default:
 			printf("OPCION NO VALIDA");

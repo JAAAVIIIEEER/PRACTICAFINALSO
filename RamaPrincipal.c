@@ -543,7 +543,7 @@ int algoAtendedores(int tipo, char *cad){
 		}
 		
 	}
-	//sprintf(cad, strcat(cad, "atiende solicitud %d"),  mayor);
+	sprintf(cad, "Atendedor %d Atiende solicitud %d", tipo, mayor);
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	
 	return valor;
