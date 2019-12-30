@@ -332,13 +332,10 @@ void solicitudTramitada(char *cad, char *cad1, int posicion){
 
 void *AccionesAtendedor(void *num){
         int contadorVecesAtiende=0;
-	//pthread_mutex_lock(&atendedore);
 	int tipo=*(int *)num;
-	//pthread_mutex_unlock(&atendedore);
-	char * cad = malloc(80 * sizeof(char));
-	char * cad1 = malloc(80 * sizeof(char));	
+	char * cad = malloc(120 * sizeof(char));
+	char * cad1 = malloc(120 * sizeof(char));	
     	while(1){
-		sprintf(cad, "Atendedor %d: ", tipo);
 		if(tipo==1){
 			int valor = algoAtendedores(tipo, cad);
 			if(valor==-1){
@@ -347,27 +344,20 @@ void *AccionesAtendedor(void *num){
 				int porcentaje=calculaAleatorios(1, 100);
 				int flag = procedimiento(porcentaje);	
 				int tiempo = tiempoAtencion(cad1, porcentaje);
-			//	pthread_mutex_lock(&atendedore);
-  				pthread_mutex_lock(&mutexColaSolicitudes);
+				
 				pthread_mutex_lock(&mutexLog); 
 				writeLogMessage(cad, cad1);
-				solicitudes[valor].atendido=1;
-				atendedores[tipo-1].atendiendo=1;
 				pthread_mutex_unlock(&mutexLog);
-			//	pthread_mutex_unlock(&atendedore);
-				pthread_mutex_unlock(&mutexColaSolicitudes);
 				
 				sleep(tiempo);
 
 				sprintf(cad1, strcat(cad1, " terminada"));
-			//	pthread_mutex_lock(&atendedore);
   				pthread_mutex_lock(&mutexColaSolicitudes);
 				pthread_mutex_lock(&mutexLog); 
 				writeLogMessage(cad, cad1);				
 				solicitudes[valor].atendido=flag;
 				atendedores[tipo-1].atendiendo=0;
 				pthread_mutex_unlock(&mutexLog);
-			//	pthread_mutex_unlock(&atendedore);
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				contadorVecesAtiende=contadorVecesAtiende+1;
 				if(contadorVecesAtiende==5){
@@ -393,26 +383,19 @@ void *AccionesAtendedor(void *num){
 				int porcentaje=calculaAleatorios(1, 100);
 				int flag = procedimiento(porcentaje);	
 				int tiempo = tiempoAtencion(cad1, porcentaje);
-			//	pthread_mutex_lock(&atendedore);
-  				pthread_mutex_lock(&mutexColaSolicitudes);
 				pthread_mutex_lock(&mutexLog); 
 				writeLogMessage(cad, cad1);	
-				solicitudes[valor].atendido=1;
-				atendedores[tipo-1].atendiendo=1;
 				pthread_mutex_unlock(&mutexLog);
-			//	pthread_mutex_unlock(&atendedore);
-				pthread_mutex_unlock(&mutexColaSolicitudes);
 								
 				sleep(tiempo);	
+
 				sprintf(cad1, strcat(cad1, " terminada"));
-			//	pthread_mutex_lock(&atendedore);
   				pthread_mutex_lock(&mutexColaSolicitudes);
 				pthread_mutex_lock(&mutexLog); 
 				writeLogMessage(cad, cad1);	
 				solicitudes[valor].atendido=flag;
 				atendedores[tipo-1].atendiendo=0;
 				pthread_mutex_unlock(&mutexLog);
-			//	pthread_mutex_unlock(&atendedore);
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				contadorVecesAtiende=contadorVecesAtiende+1;
 
@@ -439,27 +422,19 @@ void *AccionesAtendedor(void *num){
 				int porcentaje=calculaAleatorios(1, 100);
 				int flag = procedimiento(porcentaje);	
 				int tiempo = tiempoAtencion(cad1, porcentaje);
-			//	pthread_mutex_lock(&atendedore);
-  				pthread_mutex_lock(&mutexColaSolicitudes);
 				pthread_mutex_lock(&mutexLog); 
 				writeLogMessage(cad, cad1);
-				solicitudes[valor].atendido=1;
-				atendedores[tipo-1].atendiendo=1;
-			//	pthread_mutex_unlock(&atendedore);
-				pthread_mutex_unlock(&mutexColaSolicitudes);
 				pthread_mutex_unlock(&mutexLog);
 
 				sleep(tiempo);			
 	
 				sprintf(cad1, strcat(cad1, " terminada"));
-			//	pthread_mutex_lock(&atendedore);
   				pthread_mutex_lock(&mutexColaSolicitudes);
 				pthread_mutex_lock(&mutexLog); 
 				writeLogMessage(cad, cad1);
 				solicitudes[valor].atendido=flag;
 				atendedores[tipo-1].atendiendo=0;
 				pthread_mutex_unlock(&mutexLog);
-			//	pthread_mutex_unlock(&atendedore);
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				contadorVecesAtiende=contadorVecesAtiende+1;
 				if(contadorVecesAtiende==5){
@@ -496,9 +471,8 @@ int procedimiento(int porcentaje){
 
 
 int algoAtendedores(int tipo, char *cad){
-//	pthread_mutex_lock(&atendedore);
+
 	atendedores[tipo-1].tipo=tipo;
-//	pthread_mutex_unlock(&atendedore);	
 	int i;
 	int mayor=1600;
 	int valor=-1;
@@ -536,6 +510,8 @@ int algoAtendedores(int tipo, char *cad){
 		}
 		
 	}
+	solicitudes[valor].atendido=1;
+	atendedores[tipo-1].atendiendo=1;
 	sprintf(cad, "Atendedor %d Atiende solicitud %d", tipo, mayor);
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	
