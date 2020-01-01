@@ -62,6 +62,9 @@ social usuarios[4];
 
 FILE *logFile;
 
+int numeroSolicitudes;
+int numeroAtendedores;
+
 
 void manejadora_solicitudes(int sig){
   
@@ -79,8 +82,8 @@ void manejadora_terminar(int sig){
 }
 
 int main(int argc, char* argv[]){
-	int numeroSolicitudes=15;
-	int numeroAtendedores=3;
+	numeroSolicitudes=15;
+	numeroAtendedores=3;
 	if(argc==2){	
 		numeroSolicitudes=atoi(argv[1]);
 	} else if (argc==3){
@@ -160,12 +163,12 @@ void nuevaSolicitud(int sig){
      	while(solicitudes[i].id!=0){
       		i++;
       		//si llega al final de la cola se para el bucle
-      		if(i==15){
+      		if(i==numeroSolicitudes){
 			break;
 		}
     	}
    
-     	if(i!=15){
+     	if(i!=numeroSolicitudes){
       		contadorSolicitud++;
 		sprintf(cad, "Solicitud %d: ", contadorSolicitud);
 		sprintf(cad1, "Aniadida");
@@ -298,7 +301,7 @@ void *AccionesSolicitud(void *id){
 }
 
 void solicitudRechazada(char *cad, char *cad1, int posicion){
-	sprintf(cad1, "Rechazada");
+	sprintf(cad1, "Abandona la espera");
 	pthread_mutex_lock(&mutexLog);
 	writeLogMessage(cad, cad1);
 	pthread_mutex_unlock(&mutexLog);
@@ -334,6 +337,7 @@ void *AccionesAtendedor(void *num){
 			if(valor==-1){
 				sleep(1);
 			}else{
+				printf("TRATANDO SOLICITUD A\n");
 				int porcentaje=calculaAleatorios(1, 100);
 				int flag = procedimiento(porcentaje);	
 				int tiempo = tiempoAtencion(cad1, porcentaje);
@@ -344,7 +348,7 @@ void *AccionesAtendedor(void *num){
 				
 				sleep(tiempo);
 
-				sprintf(cad1, strcat(cad1, " terminada"));
+				sprintf(cad1, strcat(cad1, " terminada en %d"), tiempo);
   				pthread_mutex_lock(&mutexColaSolicitudes);
 				pthread_mutex_lock(&mutexLog); 
 				writeLogMessage(cad, cad1);
@@ -355,9 +359,9 @@ void *AccionesAtendedor(void *num){
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				contadorVecesAtiende=contadorVecesAtiende+1;
 				if(contadorVecesAtiende==5){
-					contadorVecesAtiende=0;
 					//printf("El atendedor de Invitaciones descansa\n");
-										sprintf(cad1, "Inicio descanso");
+					sprintf(cad, "Atendedor %d", tipo);
+					sprintf(cad1, "Inicio descanso");
 					pthread_mutex_lock(&mutexLog); 
 					writeLogMessage(cad, cad1);
 					pthread_mutex_unlock(&mutexLog);				
@@ -365,7 +369,8 @@ void *AccionesAtendedor(void *num){
 					pthread_mutex_lock(&mutexLog); 
 					sprintf(cad1, "Fin descanso");
 					writeLogMessage(cad, cad1);
-					pthread_mutex_unlock(&mutexLog);			
+					pthread_mutex_unlock(&mutexLog);
+					contadorVecesAtiende=0;			
 				}		
 			}      
 		}else if(tipo==2){
@@ -374,6 +379,7 @@ void *AccionesAtendedor(void *num){
 			if(valor==-1){		
 				sleep(1);
 			}else{
+				printf("TRATANDO SOLICITUD B\n");
 				int porcentaje=calculaAleatorios(1, 100);
 				int flag = procedimiento(porcentaje);	
 				int tiempo = tiempoAtencion(cad1, porcentaje);
@@ -382,8 +388,8 @@ void *AccionesAtendedor(void *num){
 				pthread_mutex_unlock(&mutexLog);
 								
 				sleep(tiempo);	
-
-				sprintf(cad1, strcat(cad1, " terminada"));
+				
+				sprintf(cad1, strcat(cad1, " terminada en %d"), tiempo);
   				pthread_mutex_lock(&mutexColaSolicitudes);
 				pthread_mutex_lock(&mutexLog); 
 				writeLogMessage(cad, cad1);
@@ -393,48 +399,10 @@ void *AccionesAtendedor(void *num){
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				contadorVecesAtiende=contadorVecesAtiende+1;
 
-				if(contadorVecesAtiende==5){
-					contadorVecesAtiende=0;
+				if(contadorVecesAtiende==5){				
 					//printf("El atendedor de QR descansa\n");
 					pthread_mutex_lock(&mutexLog); 
-					sprintf(cad1, "Inicio descanso");
-					writeLogMessage(cad, cad1);
-					pthread_mutex_unlock(&mutexLog);				
-					sleep(10);		
-					pthread_mutex_lock(&mutexLog); 
-					sprintf(cad1, "Fin descanso");
-					writeLogMessage(cad, cad1);
-					pthread_mutex_unlock(&mutexLog);			
-				}
-			}
-		}else{
-
-			int valor = algoAtendedores(tipo, cad);
-			if(valor==-1){
-				sleep(1);			
-			}else{
-				int porcentaje=calculaAleatorios(1, 100);
-				int flag = procedimiento(porcentaje);	
-				int tiempo = tiempoAtencion(cad1, porcentaje);
-				pthread_mutex_lock(&mutexLog); 
-				writeLogMessage(cad, cad1);
-				pthread_mutex_unlock(&mutexLog);
-
-				sleep(tiempo);			
-	
-				sprintf(cad1, strcat(cad1, " terminada"));
-  				pthread_mutex_lock(&mutexColaSolicitudes);
-				pthread_mutex_lock(&mutexLog); 
-				writeLogMessage(cad, cad1);
-				solicitudes[valor].atendido=flag;
-				atendedores[tipo-1].atendiendo=0;
-				pthread_mutex_unlock(&mutexLog);
-				pthread_mutex_unlock(&mutexColaSolicitudes);
-				contadorVecesAtiende=contadorVecesAtiende+1;
-				if(contadorVecesAtiende==5){
-					contadorVecesAtiende=0;
-					//printf("El atendedor PRO descansa\n");
-					pthread_mutex_lock(&mutexLog); 
+					sprintf(cad, "Atendedor %d", tipo);
 					sprintf(cad1, "Inicio descanso");
 					writeLogMessage(cad, cad1);
 					pthread_mutex_unlock(&mutexLog);				
@@ -443,6 +411,47 @@ void *AccionesAtendedor(void *num){
 					sprintf(cad1, "Fin descanso");
 					writeLogMessage(cad, cad1);
 					pthread_mutex_unlock(&mutexLog);
+					contadorVecesAtiende=0;			
+				}
+			}
+		}else{
+
+			int valor = algoAtendedores(tipo, cad);
+			if(valor==-1){
+				sleep(1);			
+			}else{
+				printf("TRATANDO SOLICITUD\n");
+				int porcentaje=calculaAleatorios(1, 100);
+				int flag = procedimiento(porcentaje);	
+				int tiempo = tiempoAtencion(cad1, porcentaje);
+				pthread_mutex_lock(&mutexLog); 
+				writeLogMessage(cad, cad1);
+				pthread_mutex_unlock(&mutexLog);
+
+				sleep(tiempo);			
+				
+				sprintf(cad1, strcat(cad1, " terminada en %d segundos"), tiempo);
+  				pthread_mutex_lock(&mutexColaSolicitudes);
+				pthread_mutex_lock(&mutexLog); 
+				writeLogMessage(cad, cad1);
+				solicitudes[valor].atendido=flag;
+				atendedores[tipo-1].atendiendo=0;
+				pthread_mutex_unlock(&mutexLog);
+				pthread_mutex_unlock(&mutexColaSolicitudes);
+				contadorVecesAtiende=contadorVecesAtiende+1;
+				if(contadorVecesAtiende==5){
+					//printf("El atendedor PRO descansa\n");
+					pthread_mutex_lock(&mutexLog); 
+					sprintf(cad, "Atendedor %d", tipo);
+					sprintf(cad1, "Inicio descanso");
+					writeLogMessage(cad, cad1);
+					pthread_mutex_unlock(&mutexLog);				
+					sleep(10);		
+					pthread_mutex_lock(&mutexLog); 
+					sprintf(cad1, "Fin descanso");
+					writeLogMessage(cad, cad1);
+					pthread_mutex_unlock(&mutexLog);
+					contadorVecesAtiende=0;
 						
 				}		
 			}	
@@ -473,7 +482,7 @@ int algoAtendedores(int tipo, char *cad){
 	//busca en la cola de solicitudes
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	if(tipo!=3){
-      	  	for(i=0; i<15; i++){
+      	  	for(i=0; i<numeroSolicitudes; i++){
 			if(solicitudes[i].tipo==tipo && solicitudes[i].atendido==0){
 				if(solicitudes[i].id<mayor && solicitudes[i].id!=0 && solicitudes[i].atendido==0){
 					mayor=solicitudes[i].id;
@@ -484,8 +493,7 @@ int algoAtendedores(int tipo, char *cad){
 		
 		}
 		if(valor==-1){
-		//	printf("No encontro de su tipo\n");
-			for(i=0; i<15; i++){
+			for(i=0; i<numeroSolicitudes; i++){
 			    if(solicitudes[i].id<mayor && solicitudes[i].id!=0 && solicitudes[i].atendido==0){
 				mayor=solicitudes[i].id;
 				valor=i;
@@ -495,7 +503,7 @@ int algoAtendedores(int tipo, char *cad){
 		}
 		
 	}else{
-		for(i=0; i<15; i++){
+		for(i=0; i<numeroSolicitudes; i++){
 	        	if(solicitudes[i].id<mayor && solicitudes[i].id!=0 && solicitudes[i].atendido==0){
 				mayor=solicitudes[i].id;
 				valor=i;
@@ -543,18 +551,16 @@ void *accionesCoordinador(){
 	pthread_t nuevoHilo;
 	while(1){
 		pthread_mutex_lock(&mutexColaSocial);
-		printf("Esperando coordinador\n");
 		pthread_cond_wait(&cond, &mutexColaSocial);	
-		printf("Coordinador sigue\n");
 		pthread_mutex_lock(&mutexLog);
-		writeLogMessage("Actividad", "Actividad comenzando");
+		writeLogMessage("Actividad", "Comenzando");
 		pthread_mutex_unlock(&mutexLog);
 		for(int i=0; i<4;i++){
 			pthread_create(&nuevoHilo, NULL, actividadCultural, (void*)&usuarios[i].id);
 		}
 		pthread_cond_wait(&cond, &mutexColaSocial);
 		pthread_mutex_lock(&mutexLog);
-		writeLogMessage("Actividad", "Actividad finalizando");
+		writeLogMessage("Actividad", "Finalizando");
 		pthread_mutex_unlock(&mutexLog);
 		contadorActividades=0;
 		int aux;
