@@ -82,6 +82,7 @@ void manejadora_terminar(int sig){
 }
 
 int main(int argc, char* argv[]){
+	printf("%d\n", getpid());
 	numeroSolicitudes=15;
 	numeroAtendedores=3;
 	if(argc==2){	
@@ -161,6 +162,7 @@ void nuevaSolicitud(int sig){
      	int i=0;
   	char * cad = malloc(50 * sizeof(char));
 	char * cad1 = malloc(50 * sizeof(char));
+	
      	while(solicitudes[i].id!=0){
       		i++;
       		//si llega al final de la cola se para el bucle
@@ -190,8 +192,10 @@ void nuevaSolicitud(int sig){
        		pthread_t hiloSolicitud;
        		solicitudes[i].hilo = hiloSolicitud;
        		pthread_create(&hiloSolicitud, NULL, AccionesSolicitud, (void*)&i);
+		
     	}
-	pthread_mutex_unlock(&mutexColaSolicitudes);   
+	pthread_mutex_unlock(&mutexColaSolicitudes);  
+	
 }
 
 
@@ -330,8 +334,9 @@ void *AccionesAtendedor(void *num){
         int contadorVecesAtiende=0;
 	int tipo=(*(int *)num);
 	pthread_mutex_unlock(&mutexColaSocial);
-	char * cad = malloc(120 * sizeof(char));
-	char * cad1 = malloc(120 * sizeof(char));
+	char * cad = (char*)malloc(200 * sizeof(char));
+	char * cad1 = (char*)malloc(200 * sizeof(char));
+	int tiempo;
     	while(1){
 			int valor = algoAtendedores(tipo, cad);
 			if(valor==-1){
@@ -339,22 +344,20 @@ void *AccionesAtendedor(void *num){
 			}else{
 				int porcentaje=calculaAleatorios(1, 100);
 				int flag = procedimiento(porcentaje);	
-				int tiempo = tiempoAtencion(cad1, porcentaje);
-				
+				tiempo = tiempoAtencion(cad1, porcentaje);				
 				pthread_mutex_lock(&mutexLog); 
 				writeLogMessage(cad, cad1);
 				pthread_mutex_unlock(&mutexLog);
-				
+				printf("%d\n", tiempo);
 				sleep(tiempo);
-
+				printf("%d B\n", tiempo);
 				sprintf(cad1, strcat(cad1, " terminada en %d segundos"), tiempo);
   				pthread_mutex_lock(&mutexColaSolicitudes);
 				pthread_mutex_lock(&mutexLog); 
 				writeLogMessage(cad, cad1);
-				pthread_mutex_unlock(&mutexLog);			
+				pthread_mutex_unlock(&mutexLog);					
 				solicitudes[valor].atendido=flag;
 				atendedores[tipo-1].atendiendo=0;
-				pthread_mutex_unlock(&mutexLog);
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				contadorVecesAtiende=contadorVecesAtiende+1;
 				if(contadorVecesAtiende==5){
@@ -370,7 +373,7 @@ void *AccionesAtendedor(void *num){
 					writeLogMessage(cad, cad1);
 					pthread_mutex_unlock(&mutexLog);
 					contadorVecesAtiende=0;			
-				}		
+				}	
 			}      
 		
 
