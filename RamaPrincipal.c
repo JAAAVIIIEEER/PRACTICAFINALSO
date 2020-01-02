@@ -93,8 +93,8 @@ int main(int argc, char* argv[]){
 	}	
    	int i;
 
-	solicitudes=calloc(numeroSolicitudes,sizeof(solicitud));
-	atendedores=calloc(numeroAtendedores,sizeof(atendedor));
+	solicitudes=(solicitud*)malloc(50*sizeof(solicitud));
+	atendedores=(atendedor*)malloc(numeroAtendedores*sizeof(atendedor));
 
    	fopen("hola.log", "w");
 
@@ -133,8 +133,7 @@ int main(int argc, char* argv[]){
 	}
   	
 	for(i = 0; i < 4; i++) {
-		usuarios[i].id=0;
-                
+		usuarios[i].id=0;            
         }
 
     	pthread_t trabajadores; 
@@ -160,12 +159,11 @@ int main(int argc, char* argv[]){
 void nuevaSolicitud(int sig){
      	pthread_mutex_lock(&mutexColaSolicitudes);
      	int i=0;
-  	char * cad = malloc(50 * sizeof(char));
-	char * cad1 = malloc(50 * sizeof(char));
+  	/*char * cad = malloc(4000 * sizeof(char));
+	char * cad1 = malloc(4000 * sizeof(char));*/
 	
      	while(solicitudes[i].id!=0){
       		i++;
-      		//si llega al final de la cola se para el bucle
       		if(i==numeroSolicitudes){
 			break;
 		}
@@ -173,6 +171,7 @@ void nuevaSolicitud(int sig){
    
      	if(i!=numeroSolicitudes){
       		contadorSolicitud++;
+		solicitudes[i].id=contadorSolicitud;
 		sprintf(cad, "Solicitud %d", contadorSolicitud);
 		sprintf(cad1, "Aniadida");
 		pthread_mutex_lock(&mutexLog); 
@@ -188,7 +187,6 @@ void nuevaSolicitud(int sig){
 		pthread_mutex_lock(&mutexLog); 
 		writeLogMessage(cad,cad1);
 		pthread_mutex_unlock(&mutexLog);
-		solicitudes[i].id=contadorSolicitud;
        		pthread_t hiloSolicitud;
        		solicitudes[i].hilo = hiloSolicitud;
        		pthread_create(&hiloSolicitud, NULL, AccionesSolicitud, (void*)&i);
@@ -198,18 +196,10 @@ void nuevaSolicitud(int sig){
 	
 }
 
-
-pid_t gettid(void) {
-	return syscall(__NR_gettid);
-} 
-
-
 void *AccionesSolicitud(void *id){
-	pthread_mutex_lock(&mutexColaSolicitudes);
 	int posicion =*(int *)id;
-	pthread_mutex_unlock(&mutexColaSolicitudes);
-	char * cad = malloc(30 * sizeof(char));
-	char * cad1 = malloc(30 * sizeof(char));
+	char * cad = malloc(4000 * sizeof(char));
+	char * cad1 = malloc(4000 * sizeof(char));
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	int  n=solicitudes[posicion].id;
 	int n1=solicitudes[posicion].tipo;
@@ -244,17 +234,19 @@ void *AccionesSolicitud(void *id){
 				solicitudRechazada(cad, cad1, posicion);
 			}                
 			//pthread_mutex_lock(&mutexColaSolicitudes);
-		}else{
-			//pthread_mutex_unlock(&mutexColaSolicitudes);
+		}else{			
+			///pthread_mutex_unlock(&mutexColaSolicitudes);
+			
 			while(solicitudes[posicion].atendido==1){
 				sleep(1);	
 			//	printf("Esta siendo atendida\n");
 
 			}
-			
-			if(solicitudes[posicion].atendido==2){
+
+			//pthread_mutex_lock(&mutexColaSolicitudes);
+			if(solicitudes[posicion].atendido==2){			
+			//pthread_mutex_unlock(&mutexColaSolicitudes);
 				int actividad = calculaAleatorios(1, 2);
-				
 				if(actividad==1){
 					while(contadorActividades==4){
 						sleep(3);
@@ -262,7 +254,6 @@ void *AccionesSolicitud(void *id){
 					//entra en la cola actividades
 					pthread_mutex_lock(&mutexColaSocial);					
 					usuarios[contadorActividades++].id=solicitudes[posicion].id;		
-					
 					sprintf(cad1, "Preparado Actividad");
 					pthread_mutex_lock(&mutexLog); 
 					writeLogMessage(cad, cad1);
@@ -271,15 +262,13 @@ void *AccionesSolicitud(void *id){
 						pthread_cond_signal(&cond);
 					}
 					pthread_mutex_unlock(&mutexColaSocial);
-
 					pthread_mutex_lock(&mutexColaSolicitudes);
   					solicitudes[posicion].tipo=0;
   					solicitudes[posicion].id=0;
   					solicitudes[posicion].atendido=0;
   					pthread_mutex_unlock(&mutexColaSolicitudes);
 					pthread_exit(NULL);
-
-			
+		
 				} else {
 					sprintf(cad1, "Tramitada sin actividad");
 					pthread_mutex_lock(&mutexLog);	
@@ -289,6 +278,7 @@ void *AccionesSolicitud(void *id){
 				}
 				
 			}else if(solicitudes[posicion].atendido==3){
+				//pthread_mutex_unlock(&mutexColaSolicitudes);
 				sprintf(cad1, "Tramitada sin actividad");
 				pthread_mutex_lock(&mutexLog);	
 				writeLogMessage(cad, cad1);
@@ -296,6 +286,7 @@ void *AccionesSolicitud(void *id){
 				solicitudTramitada(cad, cad1, posicion);
 
 			}
+			//pthread_mutex_unlock(&mutexColaSolicitudes);
 			//esperar a que termine
 			//decide participar o no en una actividad social
 		}
@@ -334,8 +325,8 @@ void *AccionesAtendedor(void *num){
         int contadorVecesAtiende=0;
 	int tipo=(*(int *)num);
 	pthread_mutex_unlock(&mutexColaSocial);
-	char * cad = (char*)malloc(200 * sizeof(char));
-	char * cad1 = (char*)malloc(200 * sizeof(char));
+	char * cad = (char*)malloc(4000 * sizeof(char));
+	char * cad1 = (char*)malloc(4000 * sizeof(char));
 	int tiempo;
     	while(1){
 			int valor = algoAtendedores(tipo, cad);
@@ -348,9 +339,7 @@ void *AccionesAtendedor(void *num){
 				pthread_mutex_lock(&mutexLog); 
 				writeLogMessage(cad, cad1);
 				pthread_mutex_unlock(&mutexLog);
-				printf("%d\n", tiempo);
 				sleep(tiempo);
-				printf("%d B\n", tiempo);
 				sprintf(cad1, strcat(cad1, " terminada en %d segundos"), tiempo);
   				pthread_mutex_lock(&mutexColaSolicitudes);
 				pthread_mutex_lock(&mutexLog); 
@@ -389,7 +378,7 @@ int procedimiento(int porcentaje){
 	}else if(porcentaje<=90){
 		return 2;
 		
-	}else if(porcentaje<=100){
+	}else{
 		return 3;
 	}
  }
@@ -402,42 +391,40 @@ int algoAtendedores(int tipo, char *cad){
 	int valor=-1;
 	//busca en la cola de solicitudes
 	pthread_mutex_lock(&mutexColaSolicitudes);
-	if(tipo!=3){
+	if(tipo<3){
       	  	for(i=0; i<numeroSolicitudes; i++){
 			if(solicitudes[i].tipo==tipo && solicitudes[i].atendido==0){
-				if(solicitudes[i].id<mayor && solicitudes[i].id!=0 && solicitudes[i].atendido==0){
+				if(solicitudes[i].id<mayor && solicitudes[i].id>0){
 					mayor=solicitudes[i].id;
 					valor=i;	
 				}
 				
-			}
-		
+			}		
 		}
 		if(valor==-1){
 			for(i=0; i<numeroSolicitudes; i++){
-			    if(solicitudes[i].id<mayor && solicitudes[i].id!=0 && solicitudes[i].atendido==0){
-				mayor=solicitudes[i].id;
-				valor=i;
-				}	
-			    }
+				if(solicitudes[i].id<mayor && solicitudes[i].id>0 && solicitudes[i].atendido==0){
+					mayor=solicitudes[i].id;
+					valor=i;
+				}			
+			}
 		
-		}
-		
-	}else{
+		}	
+	}else{	
 		for(i=0; i<numeroSolicitudes; i++){
-	        	if(solicitudes[i].id<mayor && solicitudes[i].id!=0 && solicitudes[i].atendido==0){
+	        	if(solicitudes[i].id<mayor && solicitudes[i].id>0 && solicitudes[i].atendido==0){
 				mayor=solicitudes[i].id;
 				valor=i;
 				}	
 		
-		}
-		
+		}		
 	}
-	solicitudes[valor].atendido=1;
+	if(valor>=0){
+		solicitudes[valor].atendido=1;
+	}
+	pthread_mutex_unlock(&mutexColaSolicitudes);
 	atendedores[tipo-1].atendiendo=1;
 	sprintf(cad, "Atendedor %d Atiende solicitud %d", tipo, mayor);
-	pthread_mutex_unlock(&mutexColaSolicitudes);
-	
 	return valor;
 
 }
