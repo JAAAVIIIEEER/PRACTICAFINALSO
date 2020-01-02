@@ -139,6 +139,7 @@ int main(int argc, char* argv[]){
     	pthread_t trabajadores; 
 	
 	for(i=0; i<numeroAtendedores;i++){
+		pthread_mutex_lock(&mutexColaSocial);
     		pthread_create(&trabajadores, NULL, AccionesAtendedor, (void*)&i);
 	}
 	pthread_create(&trabajadores, NULL, accionesCoordinador, NULL);
@@ -207,7 +208,6 @@ void *AccionesSolicitud(void *id){
 	char * cad1 = malloc(30 * sizeof(char));
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	int  n=solicitudes[posicion].id;
-	printf("%d\n", n);	
 	int n1=solicitudes[posicion].tipo;
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	sprintf(cad, "Solicitud %d", n);
@@ -329,6 +329,7 @@ void solicitudTramitada(char *cad, char *cad1, int posicion){
 void *AccionesAtendedor(void *num){
         int contadorVecesAtiende=0;
 	int tipo=(*(int *)num);
+	pthread_mutex_unlock(&mutexColaSocial);
 	char * cad = malloc(120 * sizeof(char));
 	char * cad1 = malloc(120 * sizeof(char));
     	while(1){
@@ -336,7 +337,6 @@ void *AccionesAtendedor(void *num){
 			if(valor==-1){
 				sleep(1);
 			}else{
-				printf("TRATANDO SOLICITUD A\n");
 				int porcentaje=calculaAleatorios(1, 100);
 				int flag = procedimiento(porcentaje);	
 				int tiempo = tiempoAtencion(cad1, porcentaje);
@@ -347,7 +347,7 @@ void *AccionesAtendedor(void *num){
 				
 				sleep(tiempo);
 
-				sprintf(cad1, strcat(cad1, " terminada en %d"), tiempo);
+				sprintf(cad1, strcat(cad1, " terminada en %d segundos"), tiempo);
   				pthread_mutex_lock(&mutexColaSolicitudes);
 				pthread_mutex_lock(&mutexLog); 
 				writeLogMessage(cad, cad1);
@@ -393,7 +393,6 @@ int procedimiento(int porcentaje){
 
 
 int algoAtendedores(int tipo, char *cad){
-
 	atendedores[tipo-1].tipo=tipo;
 	int i;
 	int mayor=1600;
