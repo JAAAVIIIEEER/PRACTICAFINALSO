@@ -170,7 +170,7 @@ void nuevaSolicitud(int sig){
    
      	if(i!=numeroSolicitudes){
       		contadorSolicitud++;
-		sprintf(cad, "Solicitud %d: ", contadorSolicitud);
+		sprintf(cad, "Solicitud %d", contadorSolicitud);
 		sprintf(cad1, "Aniadida");
 		pthread_mutex_lock(&mutexLog); 
 		writeLogMessage(cad,cad1);
@@ -210,7 +210,7 @@ void *AccionesSolicitud(void *id){
 	printf("%d\n", n);	
 	int n1=solicitudes[posicion].tipo;
 	pthread_mutex_unlock(&mutexColaSolicitudes);
-	sprintf(cad, "Solicitud %d: ", n);
+	sprintf(cad, "Solicitud %d", n);
 	while(1){
 		sleep(4);
 		//pthread_mutex_lock(&mutexColaSolicitudes); //duda poner mutex
@@ -332,7 +332,6 @@ void *AccionesAtendedor(void *num){
 	char * cad = malloc(120 * sizeof(char));
 	char * cad1 = malloc(120 * sizeof(char));
     	while(1){
-		if(tipo==1){
 			int valor = algoAtendedores(tipo, cad);
 			if(valor==-1){
 				sleep(1);
@@ -373,89 +372,9 @@ void *AccionesAtendedor(void *num){
 					contadorVecesAtiende=0;			
 				}		
 			}      
-		}else if(tipo==2){
+		
 
-			int valor = algoAtendedores(tipo, cad);
-			if(valor==-1){		
-				sleep(1);
-			}else{
-				printf("TRATANDO SOLICITUD B\n");
-				int porcentaje=calculaAleatorios(1, 100);
-				int flag = procedimiento(porcentaje);	
-				int tiempo = tiempoAtencion(cad1, porcentaje);
-				pthread_mutex_lock(&mutexLog); 
-				writeLogMessage(cad, cad1);	
-				pthread_mutex_unlock(&mutexLog);
-								
-				sleep(tiempo);	
-				
-				sprintf(cad1, strcat(cad1, " terminada en %d"), tiempo);
-  				pthread_mutex_lock(&mutexColaSolicitudes);
-				pthread_mutex_lock(&mutexLog); 
-				writeLogMessage(cad, cad1);
-				pthread_mutex_unlock(&mutexLog);
-				solicitudes[valor].atendido=flag;
-				atendedores[tipo-1].atendiendo=0;
-				pthread_mutex_unlock(&mutexColaSolicitudes);
-				contadorVecesAtiende=contadorVecesAtiende+1;
-
-				if(contadorVecesAtiende==5){				
-					//printf("El atendedor de QR descansa\n");
-					pthread_mutex_lock(&mutexLog); 
-					sprintf(cad, "Atendedor %d", tipo);
-					sprintf(cad1, "Inicio descanso");
-					writeLogMessage(cad, cad1);
-					pthread_mutex_unlock(&mutexLog);				
-					sleep(10);		
-					pthread_mutex_lock(&mutexLog); 
-					sprintf(cad1, "Fin descanso");
-					writeLogMessage(cad, cad1);
-					pthread_mutex_unlock(&mutexLog);
-					contadorVecesAtiende=0;			
-				}
-			}
-		}else{
-
-			int valor = algoAtendedores(tipo, cad);
-			if(valor==-1){
-				sleep(1);			
-			}else{
-				printf("TRATANDO SOLICITUD\n");
-				int porcentaje=calculaAleatorios(1, 100);
-				int flag = procedimiento(porcentaje);	
-				int tiempo = tiempoAtencion(cad1, porcentaje);
-				pthread_mutex_lock(&mutexLog); 
-				writeLogMessage(cad, cad1);
-				pthread_mutex_unlock(&mutexLog);
-
-				sleep(tiempo);			
-				
-				sprintf(cad1, strcat(cad1, " terminada en %d segundos"), tiempo);
-  				pthread_mutex_lock(&mutexColaSolicitudes);
-				pthread_mutex_lock(&mutexLog); 
-				writeLogMessage(cad, cad1);
-				solicitudes[valor].atendido=flag;
-				atendedores[tipo-1].atendiendo=0;
-				pthread_mutex_unlock(&mutexLog);
-				pthread_mutex_unlock(&mutexColaSolicitudes);
-				contadorVecesAtiende=contadorVecesAtiende+1;
-				if(contadorVecesAtiende==5){
-					//printf("El atendedor PRO descansa\n");
-					pthread_mutex_lock(&mutexLog); 
-					sprintf(cad, "Atendedor %d", tipo);
-					sprintf(cad1, "Inicio descanso");
-					writeLogMessage(cad, cad1);
-					pthread_mutex_unlock(&mutexLog);				
-					sleep(10);		
-					pthread_mutex_lock(&mutexLog); 
-					sprintf(cad1, "Fin descanso");
-					writeLogMessage(cad, cad1);
-					pthread_mutex_unlock(&mutexLog);
-					contadorVecesAtiende=0;
-						
-				}		
-			}	
-       		}
+			
    	}
 }
 
