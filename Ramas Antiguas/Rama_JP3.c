@@ -57,7 +57,6 @@ int tiempoAtencion(char *cad1, int porcentaje);
 int tipoDeAtencion (int porcentaje);
 int calculaAleatorios(int min, int max);
 void writeLogMessage(char *id, char *msg);
-pid_t gettid(void);
 
 // Función principal.
 int main(int argc, char* argv[]) {
@@ -75,7 +74,7 @@ int main(int argc, char* argv[]) {
 		numeroSolicitudes=atoi(argv[1]);
 		numeroAtendedores=atoi(argv[2]);
 	}
-	colaSolicitudes = (Solicitud*)malloc(50*sizeof(Solicitud));
+	colaSolicitudes = (Solicitud*)malloc(numeroSolicitudes*sizeof(Solicitud));
 	colaAtendedores = (Atendedor*)malloc(numeroAtendedores*sizeof(Atendedor));
 
    	fopen("hola.log", "w");
@@ -167,7 +166,7 @@ int espacioEnColaSolicitudes() {
 
 // Función dedicada a generar el hilo solicitud en caso de existir espacio libre en la cola de solicitudes.
 void *nuevaSolicitud(void *sig) {
-	printf("hola");
+	printf("hola\n");
 	// Solicitamos acceso a la cola colaSolicitudes.
 	pthread_mutex_lock(&mutexColaSolicitudes);  
 
@@ -200,7 +199,6 @@ void *nuevaSolicitud(void *sig) {
 
 void *accionesSolicitud(void *posEnCola){
 	int posicion =*(int *)posEnCola;
-	
 //LOG
 	char * cad = malloc(30 * sizeof(char));
 	char * cad1 = malloc(30 * sizeof(char));
@@ -218,7 +216,7 @@ void *accionesSolicitud(void *posEnCola){
 	} else {
 		sprintf(cad1, "Tipo: QR");
 	}
-	pthread_mutex_lock(&mutexLog);  //voy a escribir en en el fichero por tanto mutex
+	pthread_mutex_lock(&mutexLog);  
 	writeLogMessage(cad, cad1);
 	pthread_mutex_unlock(&mutexLog);
 //LOG
@@ -236,7 +234,7 @@ void *accionesSolicitud(void *posEnCola){
 
 			if(colaSolicitudes[posicion].tipo==2){
 				
-				printf("Es de QR  %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
+				//printf("Es de QR  %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
 				if(calculaAleatorios(1, 100)<=30){
 				//	printf("La invitacion se rechazo\n");
  					solicitudRechazada(cad, cad1, posicion);
@@ -248,7 +246,6 @@ void *accionesSolicitud(void *posEnCola){
 			}                
 			pthread_mutex_unlock(&mutexColaSolicitudes);
 		}else{
-			pthread_mutex_lock(&mutexColaSolicitudes);
 			while(colaSolicitudes[posicion].atendido==1){
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				sleep(1);
@@ -444,7 +441,6 @@ int buscadorPorPrioridades(int tipo, char *cad){
 // Función dedicada a calcular el tiempo de atención en función del porcentaje calculado previamente.
 int tiempoAtencion(char *cad1, int porcentaje) {			
 			int tiempoAtendiendo;
-
 			if(porcentaje <= 70) {
 				//printf("La solicitud esta siendo atendida correctamente\n");	
 				tiempoAtendiendo=(calculaAleatorios(1, 4));
@@ -518,16 +514,9 @@ void *actividadCultural(void *id){
 	pthread_exit(0);
 }
 
-pid_t gettid(void) {
-	return syscall(__NR_gettid);
-} 
-
-
 int calculaAleatorios(int min, int max) {
 	return rand() % (max - min + 1) + min;	
 }
-
-
 
 void writeLogMessage(char *id, char *msg) { 
 	// Se calcula la hora actual.
