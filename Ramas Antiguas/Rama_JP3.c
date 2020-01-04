@@ -44,12 +44,15 @@ int contadorSolicitudes, contadorActividades, finalizar, numeroSolicitudes, nume
 // Declaración funciones auxiliares.
 void manejadoraNuevaSolicitud(int sig);
 void manejadoraTerminar(int sig);
+void manejadoraAumentoAtendedores(int sig);
+void manejadoraAumentoSolicitudes(int sig);
 void *nuevaSolicitud(void *sig);
 void *accionesCoordinadorSocial();
 void *accionesAtendedor(void *tipo);
 void *actividadCultural(void *id);
 void *accionesSolicitud(void *posCola);
 int espacioEnColaSolicitudes();
+int colaSolicitudesVacia();
 void solicitudRechazada(char *cad, char *cad1, int posicion);
 void solicitudTramitada(char *cad, char *cad1, int posicion);
 int buscadorPorPrioridades(int tipo, char *cad);
@@ -60,19 +63,17 @@ void writeLogMessage(char *id, char *msg);
 
 // Función principal.
 int main(int argc, char* argv[]) {
-
 	// Declaración variables locales de la función principal.
 	pthread_t trabajadores;
 	int aux;
-
 	// Inicialización de variables locales, globales, condición y de los mutex.
-	numeroSolicitudes=15;
-	numeroAtendedores=3;
-	if(argc==2){	
-		numeroSolicitudes=atoi(argv[1]);
-	} else if (argc==3){
-		numeroSolicitudes=atoi(argv[1]);
-		numeroAtendedores=atoi(argv[2]);
+	numeroSolicitudes = 15;
+	numeroAtendedores = 3;
+	if(argc == 2){	
+		numeroSolicitudes = atoi(argv[1]);
+	} else if (argc == 3){
+		numeroSolicitudes = atoi(argv[1]);
+		numeroAtendedores = atoi(argv[2]);
 	}
 	colaSolicitudes = (Solicitud*)malloc(numeroSolicitudes*sizeof(Solicitud));
 	colaAtendedores = (Atendedor*)malloc(numeroAtendedores*sizeof(Atendedor));
@@ -86,6 +87,10 @@ int main(int argc, char* argv[]) {
 	solicitudes.sa_handler =  manejadoraNuevaSolicitud;
 	struct sigaction terminar = {0};
 	terminar.sa_handler = manejadoraTerminar;
+	//struct sigaction nuevosAtendedores = {0};
+	//nuevosAtendedores.sa_handler = manejadoraAumentoAtendedores;
+	struct sigaction nuevasSolicitudes = {0};
+	nuevasSolicitudes.sa_handler = manejadoraAumentoSolicitudes;
 	if(pthread_mutex_init(&mutexColaSolicitudes,NULL) != 0) {
 		exit(-1);
 	}
@@ -98,17 +103,17 @@ int main(int argc, char* argv[]) {
 	if(pthread_cond_init(&cond, NULL) != 0) {
         	exit(-1);
 	}
-	for(aux = 0; aux < 15; aux++) {
-		colaSolicitudes[aux].id = 0;
-		colaSolicitudes[aux].atendido = 0;
-		colaSolicitudes[aux].tipo = 0;
+	for(aux = 0; aux < numeroSolicitudes; aux++) {
+		(*(colaSolicitudes + aux)).id = 0;
+		(*(colaSolicitudes + aux)).atendido = 0;
+		(*(colaSolicitudes + aux)).tipo = 0;
 	}
 	for(aux = 0; aux < 4; aux++) {
 		colaSocial[aux].id = 0;
 	}
-	for(aux = 0; aux < 3; aux++) {
-		colaAtendedores[aux].atendiendo = 0;
-		colaAtendedores[aux].tipo = aux + 1; 
+	for(aux = 0; aux < numeroAtendedores; aux++) {
+		(*(colaAtendedores + aux)).atendiendo = 0;
+		(*(colaAtendedores + aux)).tipo = aux + 1; 
 	}
 	
 
@@ -125,21 +130,60 @@ int main(int argc, char* argv[]) {
 		perror("Error en el sigaction que recoge la señal SIGINT.");
 		exit(-1);
 	}
+	/*if(-1 == sigaction(SIGKILL,&nuevosAtendedores,NULL)) {
+		perror("Error en el sigaction que recoge la señal SIGKILL.");
+		exit(-1);
+	}*/
+	if(-1 == sigaction(SIGPIPE,&nuevasSolicitudes,NULL)) {
+		perror("Error en el sigaction que recoge la señal SIGPIPE.");
+		exit(-1);
+	}
 	// Creación hilos de los atendedores.
-	for(aux = 0; aux < numeroAtendedores; aux++){
-		pthread_mutex_lock(&mutexColaSocial);
+	for(aux = 1; aux <= numeroAtendedores; aux++){
     		pthread_create(&trabajadores, NULL, accionesAtendedor, (void*)&aux);
 	}
 	pthread_create(&trabajadores, NULL, accionesCoordinadorSocial, NULL);	
-
+////////////////////////////////////////
+	//// FALTAN JOINNSSSSSSSSS ///////
+///////////////////////////////////////////
 	// Bucle de señales recibidas hasta que la manejadora de la señal SIGINT cambia el valor de la variable finalizar a 1.
 	while(finalizar != 1) { 
 		pause();
 	}
+	free(colaSolicitudes);
+	free(colaAtendedores);
 
 	exit(0);
 	
 }
+// Función manejadora de la señal SIGPIPE.
+void manejadoraAumentoSolicitudes(int sig) {
+	int aux;
+	pthread_mutex_lock(&mutexColaSocial);	
+	pthread_mutex_lock(&mutexColaSolicitudes);
+	printf("Insertar nuevo numero de solicitudes : ");
+	scanf("%d",&numeroSolicitudes);
+	colaSolicitudes = (Solicitud *) realloc(colaSolicitudes, numeroSolicitudes);
+	pthread_mutex_unlock(&mutexColaSocial);	
+	pthread_mutex_unlock(&mutexColaSolicitudes);
+}
+
+// Función manejadora de la señal SIGKILL.
+/*void manejadoraAumentoAtendedores(int sig) {
+	/*pthread_t nuevosAtendedores;
+	int nuevoNumeroAtendedores,aux,i = 2;
+	pthread_mutex_lock(&mutexColaSocial);	
+	pthread_mutex_lock(&mutexColaSolicitudes);
+	printf("Insertar nuevo numero de atendedores : \n");
+	scanf("%d",&nuevoNumeroAtendedores);
+	colaAtendedores = (Atendedor *) realloc(colaAtendedores, numeroAtendedores);
+	pthread_mutex_unlock(&mutexColaSocial);	
+	pthread_mutex_unlock(&mutexColaSolicitudes);
+	for(aux = 0; aux < nuevoNumeroAtendedores; aux++){
+		pthread_mutex_lock(&mutexColaSocial);
+    		pthread_create(&nuevosAtendedores, NULL, accionesAtendedor, (void*)&i);
+	}
+}*/
 
 // Función manejadora de la señal SIGINT.
 void manejadoraTerminar(int sig) {
@@ -153,37 +197,27 @@ void manejadoraNuevaSolicitud(int sig) {
 	pthread_create(&hiloProvisional, NULL, nuevaSolicitud, (void *)&sig); 
 }
 
-// Función dedicada a buscar huecos en la cola de colaSolicitudes. Si encuentra alguno devuelve la posición del encontrado, sino, devuelve -1.
-int espacioEnColaSolicitudes() {
-	int aux;
-	for(aux = 0; aux < 15; aux++) {
-		if(colaSolicitudes[aux].id == 0) {
-			return aux;
-		}
-	}
-	return -1;
-}
-
 // Función dedicada a generar el hilo solicitud en caso de existir espacio libre en la cola de solicitudes.
 void *nuevaSolicitud(void *sig) {
 	printf("hola\n");
 	// Solicitamos acceso a la cola colaSolicitudes.
 	pthread_mutex_lock(&mutexColaSolicitudes);  
-
+	printf("pene\n");
 	// Comprobación espacio libre en cola, en caso AFIRMATIVO el método isEspacioEnColaSolicitudes() devuelve la posición del espacio libre, por el contrario devuelve el valor -1, no entrando en el if y saliendo del metódo tras desbloquear el mutex.
 	int posEspacioVacio = espacioEnColaSolicitudes();
 
 	if(posEspacioVacio != -1) {
-		printf("pe");
+		printf("pe %d \n",posEspacioVacio);
 		contadorSolicitudes++;   
-		colaSolicitudes[posEspacioVacio].id = contadorSolicitudes;
+		(*(colaSolicitudes + posEspacioVacio)).id = contadorSolicitudes;
 		if(*(int *)sig == SIGUSR1){
-			colaSolicitudes[posEspacioVacio].tipo = 1; // En caso de que la señal tratada sea SIGUSR1 se pone el atributo tipo a 1.
+			(*(colaSolicitudes + posEspacioVacio)).tipo = 1; // En caso de que la señal tratada sea SIGUSR1 se pone el atributo tipo a 1.
 		} else {
-			colaSolicitudes[posEspacioVacio].tipo = 2; // En caso de que la señal tratada sea SIGUSR2 se pone el atributo tipo a 2.
+			(*(colaSolicitudes + posEspacioVacio)).tipo = 2; // En caso de que la señal tratada sea SIGUSR2 se pone el atributo tipo a 2.
 		}
+		printf("%d\n",posEspacioVacio);
 		pthread_t hiloSolicitud;
-		colaSolicitudes[posEspacioVacio].hilo = hiloSolicitud; 
+		(*(colaSolicitudes + posEspacioVacio)).hilo = hiloSolicitud; 
 		// MENSAJE Y LOG DE AÑADIDA DEL TIPO X.
 		pthread_mutex_unlock(&mutexColaSolicitudes);
  		// Se genera el hilo correspondiente con la variable local hiloSolicitud y se elimina el hilo provisional.
@@ -203,15 +237,15 @@ void *accionesSolicitud(void *posEnCola){
 	char * cad = malloc(30 * sizeof(char));
 	char * cad1 = malloc(30 * sizeof(char));
 	pthread_mutex_lock(&mutexColaSolicitudes);
-	int  n=colaSolicitudes[posicion].id; //mutex porque puede ser modificado por un atendedor
-	int n1=colaSolicitudes[posicion].tipo;
+	int  n = (*(colaSolicitudes + posicion)).id; //mutex porque puede ser modificado por un atendedor
+	int n1 = (*(colaSolicitudes + posicion)).tipo;
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	sprintf(cad, "Solicitud %d", n);
 	sprintf(cad1, "Aniadida");
 	pthread_mutex_lock(&mutexLog);  
 	writeLogMessage(cad, cad1);
 	pthread_mutex_unlock(&mutexLog);
-	if(n1==1){
+	if(n1 == 1){
 		sprintf(cad1, "Tipo: Invitación");
 	} else {
 		sprintf(cad1, "Tipo: QR");
@@ -223,8 +257,8 @@ void *accionesSolicitud(void *posEnCola){
 	while(1){
 		sleep(4);
 		pthread_mutex_lock(&mutexColaSolicitudes);
-   		if(colaSolicitudes[posicion].atendido==0){
-			if(colaSolicitudes[posicion].tipo==1){
+   		if((*(colaSolicitudes + posicion)).atendido == 0) {
+			if((*(colaSolicitudes + posicion)).tipo == 1) {
 				printf("Es de invitacion %d\n", posicion);
 				if(calculaAleatorios(1, 100)<=10){
 					//printf("La invitacion se canso\n");
@@ -232,7 +266,7 @@ void *accionesSolicitud(void *posEnCola){
 				}		
 			}
 
-			if(colaSolicitudes[posicion].tipo==2){
+			if((*(colaSolicitudes + posicion)).tipo == 2) {
 				
 				//printf("Es de QR  %d PID=%d, SPID=%d\n", posicion , getpid(), gettid());
 				if(calculaAleatorios(1, 100)<=30){
@@ -246,28 +280,28 @@ void *accionesSolicitud(void *posEnCola){
 			}                
 			pthread_mutex_unlock(&mutexColaSolicitudes);
 		}else{
-			while(colaSolicitudes[posicion].atendido==1){
+			while((*(colaSolicitudes + posicion)).atendido == 1) {
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				sleep(1);
 				pthread_mutex_lock(&mutexColaSolicitudes);	
 				printf("Esta siendo atendida\n");
 			}
 			
-			if(colaSolicitudes[posicion].atendido==2){
+			if((*(colaSolicitudes + posicion)).atendido == 2) {
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				int actividad = calculaAleatorios(1, 2);
 				
-				if(actividad==1){
-					while(contadorActividades==4){
+				if(actividad == 1) {
+					while(contadorActividades == 4) {
 						sleep(3);
 					}
 					//entra en la cola actividades
 					pthread_mutex_lock(&mutexColaSocial);
 					pthread_mutex_lock(&mutexColaSolicitudes);					
-					colaSocial[contadorActividades++].id=colaSolicitudes[posicion].id;		
+					colaSocial[contadorActividades++].id = (*(colaSolicitudes + posicion)).id;		
 					
 					sprintf(cad1, "Preparado Actividad");
-					sprintf(cad, "Solicitud %d", colaSolicitudes[posicion].id);
+					sprintf(cad, "Solicitud %d", (*(colaSolicitudes + posicion)).id);
 					pthread_mutex_lock(&mutexLog); 
 					writeLogMessage(cad, cad1);
 					pthread_mutex_unlock(&mutexLog);
@@ -277,9 +311,9 @@ void *accionesSolicitud(void *posEnCola){
 						printf("Hola coordinador\n");
 					}
 					pthread_mutex_unlock(&mutexColaSocial);
-  					colaSolicitudes[posicion].tipo=0;
-  					colaSolicitudes[posicion].id=0;
-  					colaSolicitudes[posicion].atendido=0;
+  					(*(colaSolicitudes + posicion)).tipo=0;
+  					(*(colaSolicitudes + posicion)).id=0;
+  					(*(colaSolicitudes + posicion)).atendido=0;
   					pthread_mutex_unlock(&mutexColaSolicitudes);
 					pthread_exit(NULL);
 
@@ -292,8 +326,8 @@ void *accionesSolicitud(void *posEnCola){
 					solicitudTramitada(cad,cad1,posicion);
 				}
 				
-			}else if(colaSolicitudes[posicion].atendido==3){
-				 pthread_mutex_unlock(&mutexColaSolicitudes);
+			} else if((*(colaSolicitudes + posicion)).atendido == 3) {
+				pthread_mutex_unlock(&mutexColaSolicitudes);
 				sprintf(cad1, "Tramitada sin actividad");
 				pthread_mutex_lock(&mutexLog);	
 				writeLogMessage(cad, cad1);
@@ -315,51 +349,50 @@ void solicitudRechazada(char *cad, char *cad1, int posicion){
 	writeLogMessage(cad, cad1);
 	pthread_mutex_unlock(&mutexLog);
   	pthread_mutex_lock(&mutexColaSolicitudes);
-  	colaSolicitudes[posicion].tipo=0;
-  	colaSolicitudes[posicion].id=0;
-  	colaSolicitudes[posicion].atendido=0;
+  	(*(colaSolicitudes + posicion)).tipo=0;
+  	(*(colaSolicitudes + posicion)).id=0;
+  	(*(colaSolicitudes + posicion)).atendido=0;
   	pthread_mutex_unlock(&mutexColaSolicitudes);
   	pthread_exit(NULL);
 }
 
 void solicitudTramitada(char *cad, char *cad1, int posicion){
   	pthread_mutex_lock(&mutexColaSolicitudes);
-  	colaSolicitudes[posicion].tipo=0;
-  	colaSolicitudes[posicion].id=0;
-  	colaSolicitudes[posicion].atendido=0;
+  	(*(colaSolicitudes + posicion)).tipo=0;
+  	(*(colaSolicitudes + posicion)).id=0;
+  	(*(colaSolicitudes + posicion)).atendido=0;
   	pthread_mutex_unlock(&mutexColaSolicitudes);
   	pthread_exit(NULL);
 	//pasar a la cola de actividades
 }
 
 void *accionesAtendedor(void *tipoDeAtendedor){
-        int contadorVecesAtiende=0;
+        int contadorVecesAtiende = 0, colaVacia = 0,posEnCola = 0, porcentaje = 0, flag = 0, tiempoDeAtencion = 0;
 	int tipo = (*(int *)tipoDeAtendedor);
-	pthread_mutex_unlock(&mutexColaSocial);
 	char * cad = (char*)malloc(4000 * sizeof(char));
 	char * cad1 = (char*)malloc(4000 * sizeof(char));
 
-    	while(finalizar != 1) {
-		int posEnCola = buscadorPorPrioridades(tipo, cad);
-		if(posEnCola == -1){
+    	while(finalizar != 1 || colaVacia != 1) {
+		colaVacia = colaSolicitudesVacia();
+		if(colaVacia == 1){
 			sleep(1);
 		} else {
-			int porcentaje = calculaAleatorios(1, 100);
-			int flag = tipoDeAtencion(porcentaje);	
-			int tiempoDeAtencion = tiempoAtencion(cad1, porcentaje);
-			
+			posEnCola = buscadorPorPrioridades(tipo, cad);
+			porcentaje = calculaAleatorios(1, 100);
+			flag = tipoDeAtencion(porcentaje);	
+			tiempoDeAtencion = tiempoAtencion(cad1, porcentaje);
 			pthread_mutex_lock(&mutexLog); 
 			writeLogMessage(cad, cad1);
 			pthread_mutex_unlock(&mutexLog);
-			
+					
 			sleep(tiempoDeAtencion);
 
 			sprintf(cad1, strcat(cad1, " terminada"));
 			pthread_mutex_lock(&mutexColaSolicitudes);
 			pthread_mutex_lock(&mutexLog); 
 			writeLogMessage(cad, cad1);				
-			colaSolicitudes[posEnCola].atendido = flag;
-			colaAtendedores[tipo - 1].atendiendo = 0;
+			(*(colaSolicitudes + posEnCola)).atendido = flag;
+			(*(colaAtendedores + (tipo - 1))).atendiendo = 0;
 			pthread_mutex_unlock(&mutexLog);
 			pthread_mutex_unlock(&mutexColaSolicitudes);
 
@@ -390,74 +423,63 @@ int tipoDeAtencion(int porcentaje) {
 		return 3;
 	}
  }
-
+//  A OPTIMIZAR, NO HE VISTO MAYOR CUTRADA EN MI VIDA, MAYOR = 1600?????????????
 // Función dedicada a buscar las solicitudes en la cola colaSolicitudes en función de las prioridades.
 int buscadorPorPrioridades(int tipo, char *cad){
-	colaAtendedores[tipo - 1].tipo = tipo;
-	int i, mayor = 1600, valor = -1;
-
-	// busca en la cola de solicitudes.
+	(*(colaAtendedores + (tipo-1))).tipo=tipo;
+	int i;
+	int mayor=1600;
+	int valor=-1;
+	//busca en la cola de solicitudes
 	pthread_mutex_lock(&mutexColaSolicitudes);
-	if(tipo != 3) {
-      	  	for(i = 0; i < 15; i++) {
-			if(colaSolicitudes[i].tipo == tipo && colaSolicitudes[i].atendido == 0) {
-				if(colaSolicitudes[i].id < mayor && colaSolicitudes[i].id != 0 && colaSolicitudes[i].atendido == 0) {
-					mayor = colaSolicitudes[i].id;
-					valor = i;	
+	if(tipo < 3){
+      	  	for(i=0; i<numeroSolicitudes; i++){
+			if((*(colaSolicitudes + i)).tipo==tipo && (*(colaSolicitudes + i)).atendido==0){
+				if((*(colaSolicitudes + i)).id<mayor && (*(colaSolicitudes + i)).id>0){
+					mayor=(*(colaSolicitudes + i)).id;
+					valor=i;	
 				}
 				
+			}		
+		}
+		if(valor==-1){
+			for(i=0; i<numeroSolicitudes; i++){
+				if((*(colaSolicitudes + i)).id<mayor && (*(colaSolicitudes + i)).id>0 && (*(colaSolicitudes + i)).atendido==0){
+					mayor=(*(colaSolicitudes + i)).id;
+					valor=i;
+				}			
 			}
 		
-		}
-		if(valor == -1) {
-		//	printf("No encontro de su tipo\n");
-			for(i = 0; i < 15; i++) {
-			    if(colaSolicitudes[i].id < mayor && colaSolicitudes[i].id != 0 && colaSolicitudes[i].atendido==0){
-				mayor=colaSolicitudes[i].id;
-				valor=i;
-				}	
-			    }
-		
-		}
-		
-	}else{
-		for(i=0; i<15; i++){
-	        	if(colaSolicitudes[i].id<mayor && colaSolicitudes[i].id!=0 && colaSolicitudes[i].atendido==0){
-				mayor=colaSolicitudes[i].id;
+		}	
+	}else{	
+		for(i=0; i<numeroSolicitudes; i++){
+	        	if((*(colaSolicitudes + i)).id<mayor && (*(colaSolicitudes + i)).id>0 && (*(colaSolicitudes + i)).atendido==0){
+				mayor=(*(colaSolicitudes + i)).id;
 				valor=i;
 				}	
 		
-		}
-		
+		}		
 	}
-	colaSolicitudes[valor].atendido = 1;
-	colaAtendedores[tipo - 1].atendiendo = 1;
+	(*(colaSolicitudes + valor)).atendido = 1;
 	pthread_mutex_unlock(&mutexColaSolicitudes);
-	sprintf(cad, "Atendedor %d atiende solicitud %d", tipo, mayor);
-	
+	(*(colaAtendedores + (tipo - 1))).atendiendo=1;
+	sprintf(cad, "Atendedor %d Atiende solicitud %d", tipo, mayor);
 	return valor;
 }
 
 // Función dedicada a calcular el tiempo de atención en función del porcentaje calculado previamente.
-int tiempoAtencion(char *cad1, int porcentaje) {			
-			int tiempoAtendiendo;
-			if(porcentaje <= 70) {
-				//printf("La solicitud esta siendo atendida correctamente\n");	
-				tiempoAtendiendo=(calculaAleatorios(1, 4));
-				sprintf(cad1, "Atención sin errores");
-				//puede asociarse a una actividad cultural
-			}else if(porcentaje <= 90) {
-				//printf("La solicitud esta siendo atendida con errores\n");
-				tiempoAtendiendo=(calculaAleatorios(2, 6));
-				sprintf(cad1, "Atención con errores");
-
-				//puede asociarse a una actividad cultural
-			}else if(porcentaje <= 100) {
-				//printf("La solicitud esta siendo atendida con antecedentes\n");
-				tiempoAtendiendo=(calculaAleatorios(6, 10));
-				sprintf(cad1, "Atención por antecedentes");
-				//liberaria hueco en la cola de solicitudes y se iria
-			}
+int tiempoAtencion(char *cad1, int porcentaje) {
+	int tiempoAtendiendo;
+	if(porcentaje <= 70) {
+		tiempoAtendiendo = calculaAleatorios(1, 4);
+		sprintf(cad1, "Atención sin errores.");
+	} else if(porcentaje <= 90) {
+		tiempoAtendiendo = calculaAleatorios(2, 6);
+		sprintf(cad1, "Atención con errores.");
+	}else if(porcentaje <= 100) {
+		tiempoAtendiendo = calculaAleatorios(6, 10);
+		sprintf(cad1, "Atención por antecedentes.");
+	}
 	return tiempoAtendiendo;
 }
 
@@ -512,6 +534,28 @@ void *actividadCultural(void *id){
 		pthread_cond_signal(&cond);
 	}
 	pthread_exit(0);
+}
+
+// Función dedicada a buscar huecos en la cola de colaSolicitudes. Si encuentra alguno devuelve la posición del encontrado, sino, devuelve -1.
+int espacioEnColaSolicitudes() {
+	int aux;
+	for(aux = 0; aux < numeroSolicitudes; aux++) {
+		if((*(colaSolicitudes + aux)).id == 0) {
+			return aux;
+		}
+	}
+	return -1;
+}
+
+//
+int colaSolicitudesVacia() {
+	int aux;
+	for(aux = 0; aux < numeroSolicitudes; aux++) {
+		if((*(colaSolicitudes + aux)).id != 0) {
+			return 0;
+		}
+	}
+	return 1;
 }
 
 int calculaAleatorios(int min, int max) {
