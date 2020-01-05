@@ -65,6 +65,7 @@ void writeLogMessage(char *id, char *msg);
 int main(int argc, char* argv[]) {
 	// Declaración variables locales de la función principal.
 	pthread_t atendedores,coordinador;
+	printf("%d\n", getpid());
 	int aux;
 	// Inicialización de variables locales, globales, condición y de los mutex.
 	numeroSolicitudes = 15;
@@ -209,13 +210,12 @@ void manejadoraNuevaSolicitud(int sig) {
 
 // Función dedicada a generar el hilo solicitud en caso de existir espacio libre en la cola de solicitudes.
 void *nuevaSolicitud(void *sig) {
-	int senal = (*(int *)sig); 
-	//printf("hola2\n"); 
+	int senal = (*(int *)sig);
+	int posEspacioVacio;
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	// Comprobación espacio libre en cola, en caso AFIRMATIVO el método isEspacioEnColaSolicitudes() devuelve la posición del espacio libre, por el contrario devuelve el valor -1, no entrando en el if y saliendo del metódo tras desbloquear el mutex.
 	pthread_mutex_lock(&mutexColaSolicitudes);
-	///	printf("hola3\n");
-	int posEspacioVacio = espacioEnColaSolicitudes();
+	posEspacioVacio = espacioEnColaSolicitudes();
 
 	if(posEspacioVacio != -1) {
 		contadorSolicitudes++;   
@@ -227,9 +227,8 @@ void *nuevaSolicitud(void *sig) {
 		}
 		pthread_t hiloSolicitud;
 		(*(colaSolicitudes + posEspacioVacio)).hilo = hiloSolicitud; 
-
  		// Se genera el hilo correspondiente con la variable local hiloSolicitud y se elimina el hilo provisional.
-		pthread_create(&hiloSolicitud, NULL, *accionesSolicitud, (void *)&posEspacioVacio);
+		pthread_create(&hiloSolicitud, NULL, *accionesSolicitud, (void *)&contadorSolicitudes);
 		pthread_exit(NULL); 
 	} else {
 		// Se desbloquea la cola colaSolicitudes si no hay espacio en dicha cola y se elimina el hilo provisional.
@@ -239,10 +238,10 @@ void *nuevaSolicitud(void *sig) {
 	
 }
 
-void *accionesSolicitud(void *posEnCola){
-	int posicion = (*(int *)posEnCola);
-	char * identificadorSolicitud = (char *)malloc((numeroSolicitudes + 10)* sizeof(char));
-	char * eventoSolicitud = (char *)malloc(200 * sizeof(char));
+void *accionesSolicitud(void *id){
+	int posicion;
+	int idAux=(*(int *)id);
+	int i;
 			//	printf("hola4\n");
 	// Se indica que una nueva solicitud ha sido añadida en la cola.
 	//sprintf(identificadorSolicitud, "Solicitud_%d", (*(colaSolicitudes + posicion)).id);
@@ -254,12 +253,26 @@ void *accionesSolicitud(void *posEnCola){
 	//} else {
 	//	strcat(eventoSolicitud, "Tipo de solicitud: QR.");
 	//}
+	for(i=0; i<contadorSolicitudes;i++){
+		if((*(colaSolicitudes+i)).id==idAux){
+			posicion=i;
+			break;
+		}
+	}
 	pthread_mutex_unlock(&mutexColaSolicitudes);
+	char * identificadorSolicitud = (char *)malloc((numeroSolicitudes + 10)* sizeof(char));
+	char * eventoSolicitud = (char *)malloc(200 * sizeof(char));
 	// Se desbloquea el acceso a la cola de solicitudes y se bloquea el acceso a los logs.
 	sprintf(identificadorSolicitud, "Solicitud_%d", contadorSolicitudes);
 	pthread_mutex_lock(&mutexLog);  
-	writeLogMessage(identificadorSolicitud, "añadida.");
+	writeLogMessage(identificadorSolicitud, "Añadida.");
+	if((*(colaSolicitudes+posicion)).tipo==1){
+		writeLogMessage(identificadorSolicitud, "Tipo QR.");
+	} else {
+		writeLogMessage(identificadorSolicitud, "Tipo invitación.");
+	}
 	pthread_mutex_unlock(&mutexLog);
+	
 	// Se desbloquea el acceso a los logs.
 	while(1) {
 		// Se duerme el hilo solicitud 4 segundos.
@@ -294,35 +307,29 @@ void *accionesSolicitud(void *posEnCola){
 			}                
 			pthread_mutex_unlock(&mutexColaSolicitudes);
 		} else {
+		
 			while((*(colaSolicitudes + posicion)).atendido == 1) {
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				sleep(1);
 				pthread_mutex_lock(&mutexColaSolicitudes);	
-
 			}
-			
 			if((*(colaSolicitudes + posicion)).atendido == 2) {
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				int actividad = calculaAleatorios(1, 2);
-				
 				if(actividad == 1) {
 					while(contadorActividades == 4) {
-						sleep(3);
+						sleep(1);
 					}
 					//entra en la cola actividades
 					pthread_mutex_lock(&mutexColaSocial);
 					pthread_mutex_lock(&mutexColaSolicitudes);					
 					colaSocial[contadorActividades++].id = (*(colaSolicitudes + posicion)).id;		
-					
 					sprintf(eventoSolicitud, "Preparado Actividad");
-					sprintf(identificadorSolicitud, "Solicitud %d", (*(colaSolicitudes + posicion)).id);
 					pthread_mutex_lock(&mutexLog); 
 					writeLogMessage(identificadorSolicitud, eventoSolicitud);
 					pthread_mutex_unlock(&mutexLog);
-					printf("ContadorActividades %d\n", contadorActividades);
 					if(contadorActividades==4){
 						pthread_cond_signal(&cond);
-						printf("Hola coordinador\n");
 					}
 					pthread_mutex_unlock(&mutexColaSocial);
   					(*(colaSolicitudes + posicion)).tipo=0;
@@ -401,8 +408,7 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 			pthread_mutex_lock(&mutexLog); 
 			writeLogMessage(identificador, evento);	
 			pthread_mutex_unlock(&mutexLog);
-			pthread_mutex_lock(&mutexColaSolicitudes);
-			///printf("atendida\n");			
+			pthread_mutex_lock(&mutexColaSolicitudes);			
 			(*(colaSolicitudes + posEnColaSolicitud)).atendido = flagAtendido;
 			(*(colaAtendedores + posAtendedor)).atendiendo = 0;
 			pthread_mutex_unlock(&mutexColaSolicitudes);
@@ -510,13 +516,13 @@ int tiempoAtencion(char *evento, int porcentaje, int posEnColaSolicitud) {
 	int tiempoAtendiendo;
 	if(porcentaje <= 70) {
 		tiempoAtendiendo = calculaAleatorios(1, 4);
-		sprintf(evento,"Solicitud %d atendiendo correctamente",(*(colaSolicitudes + posEnColaSolicitud)).id);
+		sprintf(evento,"Solicitud %d atendiendo correctamente %d",(*(colaSolicitudes + posEnColaSolicitud)).id,tiempoAtendiendo);
 	} else if(porcentaje > 70 && porcentaje <= 90) {
 		tiempoAtendiendo = calculaAleatorios(2, 6);
-		sprintf(evento,"Solicitud %d atendiendo con errores",(*(colaSolicitudes + posEnColaSolicitud)).id);
+		sprintf(evento,"Solicitud %d atendiendo con errores %d",(*(colaSolicitudes + posEnColaSolicitud)).id,tiempoAtendiendo);
 	}else if(porcentaje > 90) {
 		tiempoAtendiendo = calculaAleatorios(6, 10);
-		sprintf(evento,"Solicitud %d atendiendo con antecedentes",(*(colaSolicitudes + posEnColaSolicitud)).id);
+		sprintf(evento,"Solicitud %d atendiendo con antecedentes %d",(*(colaSolicitudes + posEnColaSolicitud)).id,tiempoAtendiendo);
 	}
 	return tiempoAtendiendo;
 }
