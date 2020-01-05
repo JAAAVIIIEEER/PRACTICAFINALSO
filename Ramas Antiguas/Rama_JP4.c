@@ -55,7 +55,7 @@ int espacioEnColaSolicitudes();
 void solicitudRechazada(int posEnCola);
 void solicitudTramitada(char *cad, char *cad1, int posicion);
 int buscadorPorTipos(int tipo,char * evento);
-int buscadorPorTiposAux(int tipo);
+int buscadorPorTiposAux();
 int tiempoAtencion(char *evento, int porcentaje, int posEnColaSolicitud);
 int tipoDeAtencion (int porcentaje);
 int calculaAleatorios(int min, int max);
@@ -68,13 +68,14 @@ int main(int argc, char* argv[]) {
 	int aux;
 	// Inicialización de variables locales, globales, condición y de los mutex.
 	numeroSolicitudes = 15;
-	numeroAtendedores = 1;
+	numeroAtendedores = 3;
 	if(argc == 2){	
 		numeroSolicitudes = atoi(argv[1]);
 	} else if (argc == 3){
 		numeroSolicitudes = atoi(argv[1]);
 		numeroAtendedores = atoi(argv[2]);
 	}
+	
 	colaSolicitudes = (Solicitud*)malloc(numeroSolicitudes*sizeof(Solicitud));
 	colaAtendedores = (Atendedor*)malloc(numeroAtendedores*sizeof(Atendedor));
    	fopen("hola.log", "w");
@@ -102,10 +103,13 @@ int main(int argc, char* argv[]) {
 	if(pthread_cond_init(&cond, NULL) != 0) {
         	exit(-1);
 	}
-	for(aux = 0; aux < numeroSolicitudes; aux++) {
-		(*(colaSolicitudes + aux)).id = 0;
-		(*(colaSolicitudes + aux)).atendido = 0;
-		(*(colaSolicitudes + aux)).tipo = 0;
+
+///CAMBIAR ERA UNA PRUEBA
+int i;
+	for(i = 0; i < numeroSolicitudes; i++) {
+		colaSolicitudes[i].id = 0;
+		colaSolicitudes[i].atendido = 0;
+		colaSolicitudes[i].tipo = 0;
 	}
 	
 	
@@ -139,11 +143,12 @@ int main(int argc, char* argv[]) {
 		perror("Error en el sigaction que recoge la señal SIGPIPE.");
 		exit(-1);
 	}
+	
 	// Creación hilos de los atendedores.
 	pthread_create(&coordinador, NULL, accionesCoordinadorSocial, NULL);	
 	for(aux = 0; aux < numeroAtendedores; aux++) {
+		pthread_mutex_lock(&mutexColaSolicitudes);
     		pthread_create(&atendedores, NULL, accionesAtendedor, (void*)&aux);
-		sleep(1);
 	}
 	
 ////////////////////////////////////////
@@ -196,7 +201,6 @@ void manejadoraTerminar(int sig) {
 // Función manejadora de las señales SIGUSR1 y SIGUSR2.
 void manejadoraNuevaSolicitud(int sig) {
 	pthread_t hiloProvisional;
-	printf("hola\n");
 	// Solicitamos acceso a la cola colaSolicitudes y bloqueamos para proteger la posición de memoria de la variable sig.
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	// Se genera un hilo provisional independientemente de si hay espacio en la cola de solicitudes o no. El hilo "padre" vuelve rápidamente a esperar por más señales a la función principal.
@@ -252,7 +256,7 @@ void *accionesSolicitud(void *posEnCola){
 	//}
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	// Se desbloquea el acceso a la cola de solicitudes y se bloquea el acceso a los logs.
-	strcat(identificadorSolicitud,(*(colaSolicitudes + posicion)).id;
+	sprintf(identificadorSolicitud, "Solicitud_%d", contadorSolicitudes);
 	pthread_mutex_lock(&mutexLog);  
 	writeLogMessage(identificadorSolicitud, "añadida.");
 	pthread_mutex_unlock(&mutexLog);
@@ -373,28 +377,27 @@ void solicitudTramitada(char *cad, char *cad1, int posicion){
 
 void *accionesAtendedor(void *posEnColaAtendedor) {
         int contadorVecesAtiende = 0, posEnColaSolicitud = 0, porcentaje = 0, flagAtendido = 0, tiempoDeAtencion = 0, posAtendedor = (*(int *)posEnColaAtendedor);
+	pthread_mutex_unlock(&mutexColaSolicitudes);
 	char * identificador = (char *) malloc((10 + numeroAtendedores) * sizeof(char));
 	//sprintf(identificador, "Atendedor_%d", posAtendedor + 1);
-	strcat(identificador,posAtendedor);
+
+	sprintf(identificador, "Atendedor_%d", posAtendedor);
 	char * evento = (char *) malloc(200 * sizeof(char));
 	
-
     	while(finalizar != 1 || posEnColaSolicitud != -1) {
-		printf("hola5\n");
-		posEnColaSolicitud = buscadorPorTipos((*(colaAtendedores + posAtendedor)).tipo,evento);
+		posEnColaSolicitud = buscadorPorTipos(posAtendedor,evento);
 		if(posEnColaSolicitud == -1){
 			sleep(1);
 		} else {
 			//printf("llegue\n");
+			tiempoDeAtencion = tiempoAtencion(evento, porcentaje,posEnColaSolicitud);
 			pthread_mutex_lock(&mutexLog); 
 			writeLogMessage(identificador, evento);
 			pthread_mutex_unlock(&mutexLog);
 			porcentaje = calculaAleatorios(1, 100);
-			flagAtendido = tipoDeAtencion(porcentaje);
-			tiempoDeAtencion = tiempoAtencion(evento, porcentaje,posEnColaSolicitud);
-					
+			flagAtendido = tipoDeAtencion(porcentaje);					
 			sleep(tiempoDeAtencion);
-
+			sprintf(evento,strcat(evento, " finalizada en %d segundos"), tiempoDeAtencion);
 			pthread_mutex_lock(&mutexLog); 
 			writeLogMessage(identificador, evento);	
 			pthread_mutex_unlock(&mutexLog);
@@ -434,33 +437,37 @@ int tipoDeAtencion(int porcentaje) {
 int buscadorPorTipos(int tipo, char * evento) {
 	int i = 0, posEnCola = 0, aux = 0;
 	//printf("holaaaa\n");
+	//VALOR AUX valor del de mayor espera SI ENCUENTRA ALGUNA SOLICITUD
+	//VALOR AUX=0 SI NO ENCUENTRA SOLICITUD
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	if(tipo < 3) {
 		for(i = 0; i < numeroSolicitudes; i++) {
 			if((*(colaSolicitudes + i)).tipo == tipo && (*(colaSolicitudes + i)).atendido == 0) {
-				if(aux == 0) {
+				if(aux == 0 && (*(colaSolicitudes + i)).id>0) {
 					posEnCola = i;
-					aux = -1;
-				} else if((*(colaSolicitudes + i)).id < (*(colaSolicitudes + posEnCola)).id) {
-					posEnCola = i;	
-				}
+					aux = (*(colaSolicitudes + i)).id;
+				} else if((*(colaSolicitudes + i)).id < aux && (*(colaSolicitudes + i)).id>0) {
+					posEnCola = i;
+					aux = (*(colaSolicitudes + i)).id;			
+				}			
 			}	
 		}
 		if(aux == 0) {
 			if(tipo == 1) {
-				posEnCola = buscadorPorTiposAux(2);
+				posEnCola = buscadorPorTiposAux();
 			} else {
-				posEnCola = buscadorPorTiposAux(1);
+				posEnCola = buscadorPorTiposAux();
 			}
 		}
 	} else {
 		for(i = 0; i < numeroSolicitudes; i++) {
 			if((*(colaSolicitudes + i)).id != 0 && (*(colaSolicitudes + i)).atendido == 0) {
-				if(aux == 0) {
+				if(aux == 0 && (*(colaSolicitudes + i)).id>0) {
 					posEnCola = i;
-					aux = -1;
-				} else if((*(colaSolicitudes + i)).id < (*(colaSolicitudes + posEnCola)).id) {
-					posEnCola = i;	
+					aux = (*(colaSolicitudes + i)).id;
+				} else if((*(colaSolicitudes + i)).id < aux && (*(colaSolicitudes + i)).id>0) {
+					posEnCola = i;
+					aux = (*(colaSolicitudes + i)).id;
 				}
 			}
 		}
@@ -469,28 +476,26 @@ int buscadorPorTipos(int tipo, char * evento) {
 		}
 	}
 	if(posEnCola == -1) {
-		//printf("holaaaaaaaaa\n");
 		pthread_mutex_unlock(&mutexColaSolicitudes);
-		sleep(2);
 		return -1;
 	}
 	(*(colaSolicitudes + posEnCola)).atendido = 1;
 	//sprintf(evento, "Atendiendo solicitud %d...",(*(colaSolicitudes + posEnCola)).id);
-	//printf("hey\n");
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	(*(colaAtendedores + (tipo - 1))).atendiendo=1;
 	return posEnCola;
 }
 
-int buscadorPorTiposAux(int tipo) {
+int buscadorPorTiposAux() {
 	int i = 0, aux = 0, posEnCola = 0;
 	for(i = 0; i < numeroSolicitudes; i++) {
-			if((*(colaSolicitudes + i)).tipo == tipo && (*(colaSolicitudes + i)).atendido == 0) {
-				if(aux == 0) {
+			if((*(colaSolicitudes + i)).atendido == 0) {
+				if(aux == 0 && (*(colaSolicitudes + i)).id>0) {
 					posEnCola = i;
-					aux = -1;
-				} else if((*(colaSolicitudes + i)).id < (*(colaSolicitudes + posEnCola)).id) {
+					aux = (*(colaSolicitudes + i)).id;
+				} else if((*(colaSolicitudes + i)).id < aux && (*(colaSolicitudes + i)).id>0) {
 					posEnCola = i;	
+					aux = (*(colaSolicitudes + i)).id;
 				}
 			}	
 	}
@@ -505,13 +510,13 @@ int tiempoAtencion(char *evento, int porcentaje, int posEnColaSolicitud) {
 	int tiempoAtendiendo;
 	if(porcentaje <= 70) {
 		tiempoAtendiendo = calculaAleatorios(1, 4);
-		sprintf(evento,"Solicitud %d atendida correctamente en %d segundos.",(*(colaSolicitudes + posEnColaSolicitud)).id, tiempoAtendiendo);
+		sprintf(evento,"Solicitud %d atendiendo correctamente",(*(colaSolicitudes + posEnColaSolicitud)).id);
 	} else if(porcentaje > 70 && porcentaje <= 90) {
 		tiempoAtendiendo = calculaAleatorios(2, 6);
-		sprintf(evento,"Solicitud %d atendida con errores en datos personales en %d segundos.",(*(colaSolicitudes + posEnColaSolicitud)).id, tiempoAtendiendo);
+		sprintf(evento,"Solicitud %d atendiendo con errores",(*(colaSolicitudes + posEnColaSolicitud)).id);
 	}else if(porcentaje > 90) {
 		tiempoAtendiendo = calculaAleatorios(6, 10);
-		sprintf(evento,"Solicitud %d atendida con antecedentes en %d segundos.",(*(colaSolicitudes + posEnColaSolicitud)).id, tiempoAtendiendo);
+		sprintf(evento,"Solicitud %d atendiendo con antecedentes",(*(colaSolicitudes + posEnColaSolicitud)).id);
 	}
 	return tiempoAtendiendo;
 }
