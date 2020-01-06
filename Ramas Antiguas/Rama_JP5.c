@@ -25,15 +25,9 @@ typedef struct {
 } Solicitud;
 
 typedef struct {
-	int atendiendo;
-  	int tipo;
-} Atendedor;
-
-typedef struct {
  	int id; 
 } Social;
 
-Atendedor  * colaAtendedores;
 Solicitud * colaSolicitudes;
 Social colaSocial[4];
 
@@ -78,7 +72,6 @@ int main(int argc, char* argv[]) {
 	}
 	
 	colaSolicitudes = (Solicitud*)malloc(numeroSolicitudes*sizeof(Solicitud));
-	colaAtendedores = (Atendedor*)malloc(numeroAtendedores*sizeof(Atendedor));
    	fopen("Tsunami.log", "w");
 	contadorSolicitudes = 0;
 	contadorActividades = 0;
@@ -115,11 +108,6 @@ int main(int argc, char* argv[]) {
 	for(aux = 0; aux < 4; aux++) {
 		colaSocial[aux].id = 0;
 	}
-	for(aux = 0; aux < numeroAtendedores; aux++) {
-		(*(colaAtendedores + aux)).atendiendo = 0;
-		(*(colaAtendedores + aux)).tipo = aux + 1; 
-	}
-	
 
 	// Tratamiento de las señales recibidas mediante sigaction.
 	if(-1 == sigaction(SIGUSR2,&solicitudes,NULL)) {
@@ -175,7 +163,6 @@ int main(int argc, char* argv[]) {
 
 	}while(cont==4);
 	free(colaSolicitudes);
-	free(colaAtendedores);
 	exit(0);
 	
 }
@@ -185,7 +172,7 @@ void manejadoraAumentoSolicitudes(int sig) {
 	char * modificadoSolicitudes = (char *)malloc(200 * sizeof(char));	
 	pthread_mutex_lock(&mutexColaSocial);	
 	pthread_mutex_lock(&mutexColaSolicitudes);
-	printf("Insertar nuevo numero de solicitudes : ");
+	printf("Insertar nuevo numero de solicitudes: ");
 	scanf("%d",&numeroSolicitudes);
 	colaSolicitudes = (Solicitud *) realloc(colaSolicitudes, numeroSolicitudes*sizeof(Solicitud));
 	for(aux; aux<numeroSolicitudes; aux++){
@@ -209,7 +196,6 @@ void manejadoraAumentoAtendedores(int sig) {
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	printf("Insertar nuevo numero de atendedores: ");
 	scanf("%d",&numeroAtendedores);
-	colaAtendedores = (Atendedor *) realloc(colaAtendedores, numeroAtendedores*sizeof(Atendedor));
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	sprintf(modificadoAtendedores, "Modificado a %d", numeroAtendedores);
 	pthread_mutex_lock(&mutexLog);
@@ -425,7 +411,6 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 			pthread_mutex_unlock(&mutexLog);
 			pthread_mutex_lock(&mutexColaSolicitudes);			
 			(*(colaSolicitudes + posEnColaSolicitud)).atendido = flagAtendido;
-			(*(colaAtendedores + posAtendedor)).atendiendo = 0;
 			pthread_mutex_unlock(&mutexColaSolicitudes);
 			contadorVecesAtiende++;
 			if(contadorVecesAtiende == 5) {
@@ -502,7 +487,6 @@ int buscadorPorTipos(int tipo, char * evento) {
 	(*(colaSolicitudes + posEnCola)).atendido = 1;
 	sprintf(evento, "Atendiendo Solicitud_%d...",(*(colaSolicitudes + posEnCola)).id);
 	pthread_mutex_unlock(&mutexColaSolicitudes);
-	(*(colaAtendedores + (tipo - 1))).atendiendo=1;
 	return posEnCola;
 }
 
