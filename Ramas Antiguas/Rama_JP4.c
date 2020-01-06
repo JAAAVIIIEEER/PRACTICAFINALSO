@@ -168,6 +168,7 @@ int i;
 // Función manejadora de la señal SIGPIPE.
 void manejadoraAumentoSolicitudes(int sig) {
 	int aux;
+	char * modificadoSolicitudes = (char *)malloc(200 * sizeof(char));	
 	pthread_mutex_lock(&mutexColaSocial);	
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	printf("Insertar nuevo numero de solicitudes : ");
@@ -175,21 +176,30 @@ void manejadoraAumentoSolicitudes(int sig) {
 	colaSolicitudes = (Solicitud *) realloc(colaSolicitudes, numeroSolicitudes);
 	pthread_mutex_unlock(&mutexColaSocial);	
 	pthread_mutex_unlock(&mutexColaSolicitudes);
+	sprintf(modificadoSolicitudes, "Modificado a %d", numeroSolicitudes);
+	pthread_mutex_lock(&mutexLog);
+	writeLogMessage("Numero Solicitudes", modificadoSolicitudes);
+	pthread_mutex_unlock(&mutexLog);
 }
 
 // Función manejadora de la señal SIGTERM.
 void manejadoraAumentoAtendedores(int sig) {
 	pthread_t nuevosAtendedores;
 	int nuevoNumeroAtendedores,aux;
-	pthread_mutex_lock(&mutexColaSocial);	
+	char * modificadoAtendedores = (char *)malloc(200 * sizeof(char));	
 	pthread_mutex_lock(&mutexColaSolicitudes);
-	printf("Insertar nuevo numero de atendedores : \n");
+	printf("Insertar nuevo numero de atendedores:\n");
 	scanf("%d",&nuevoNumeroAtendedores);
-	colaAtendedores = (Atendedor *) realloc(colaAtendedores, numeroAtendedores);
+	colaAtendedores = (Atendedor *) realloc(colaAtendedores, nuevoNumeroAtendedores);
+	aux=numeroAtendedores;
+	numeroAtendedores=nuevoNumeroAtendedores;
 	pthread_mutex_unlock(&mutexColaSolicitudes);
-	pthread_mutex_unlock(&mutexColaSocial);
-	for(aux = numeroAtendedores; aux < nuevoNumeroAtendedores; aux++) {
-		pthread_mutex_unlock(&mutexColaSocial);
+	sprintf(modificadoAtendedores, "Modificado a %d", numeroAtendedores);
+	pthread_mutex_lock(&mutexLog);
+	writeLogMessage("Numero Atendedores", modificadoAtendedores);
+	pthread_mutex_unlock(&mutexLog);
+	for(aux; aux < nuevoNumeroAtendedores; aux++) {
+		pthread_mutex_lock(&mutexColaSolicitudes);
     		pthread_create(&nuevosAtendedores, NULL, accionesAtendedor, (void*)&aux);
 	}
 }
@@ -230,7 +240,7 @@ void *nuevaSolicitud(void *sig) {
  		// Se genera el hilo correspondiente con la variable local hiloSolicitud y se elimina el hilo provisional.
 		pthread_create(&hiloSolicitud, NULL, *accionesSolicitud, (void *)&contadorSolicitudes);
 		pthread_exit(NULL); 
-	} else {
+	} else {  
 		// Se desbloquea la cola colaSolicitudes si no hay espacio en dicha cola y se elimina el hilo provisional.
 		pthread_mutex_unlock(&mutexColaSolicitudes);
 		pthread_exit(NULL);
@@ -536,12 +546,13 @@ int tiempoAtencion(char *evento, int porcentaje, int posEnColaSolicitud) {
 void *accionesCoordinadorSocial(){
 	pthread_t nuevoHilo;
 	while(1){
+		int i;
 		pthread_mutex_lock(&mutexColaSocial);
 		pthread_cond_wait(&cond, &mutexColaSocial);	
 		pthread_mutex_lock(&mutexLog);
 		writeLogMessage("Actividad", "Comenzando");
 		pthread_mutex_unlock(&mutexLog);
-		for(int i=0; i<4;i++){
+		for(i=0; i<4;i++){
 			pthread_create(&nuevoHilo, NULL, actividadCultural, (void*)&colaSocial[i].id);
 		}
 		pthread_cond_wait(&cond, &mutexColaSocial);
@@ -550,8 +561,8 @@ void *accionesCoordinadorSocial(){
 		pthread_mutex_unlock(&mutexLog);
 		contadorActividades=0;
 		int aux;
-		for(aux = 0; aux < 3; aux++) {
-			colaSocial[aux].id=0;     		
+		for(i = 0; i < 3; i++) {
+			colaSocial[i].id=0;     		
        		}	
 		pthread_mutex_unlock(&mutexColaSocial);
 	}
