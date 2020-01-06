@@ -17,8 +17,8 @@ int main(){
 		printf("	1.- SIGUSR1\n");
 		printf("	2.- SIGUSR2\n");
 		printf("	3.- SIGUSR1+SIGUSR2\n");
-		printf("	4.- SIGUSR1+SIGUSR1\n");
-		printf("	5.- SIGUSR2+SIGUSR2\n");
+		printf("	4.- SIGTERM\n");
+		printf("	5.- SIGPIPE\n");
 		printf("	6.- SIGINT\n");
 		printf("	7.- Modificar PID\n");
 		printf("	8.- Salir\n");
@@ -35,12 +35,10 @@ int main(){
 			kill(pid, SIGUSR2);
 			break;
 		case 4:
-			kill(pid, SIGUSR1);
-			kill(pid, SIGUSR1);
+			kill(pid, SIGTERM);
 			break;
 		case 5:
-			kill(pid, SIGUSR2);
-			kill(pid, SIGUSR2);
+			kill(pid, SIGPIPE);
 			break;
 		case 6:
 			kill(pid, SIGINT);
