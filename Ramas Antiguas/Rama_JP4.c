@@ -267,9 +267,9 @@ void *accionesSolicitud(void *id){
 	pthread_mutex_lock(&mutexLog);  
 	writeLogMessage(identificadorSolicitud, "Añadida.");
 	if((*(colaSolicitudes+posicion)).tipo==1){
-		writeLogMessage(identificadorSolicitud, "Tipo QR.");
+		writeLogMessage(identificadorSolicitud, "Tipo Invitación.");
 	} else {
-		writeLogMessage(identificadorSolicitud, "Tipo invitación.");
+		writeLogMessage(identificadorSolicitud, "Tipo QR.");
 	}
 	pthread_mutex_unlock(&mutexLog);
 	
@@ -303,7 +303,11 @@ void *accionesSolicitud(void *id){
 			}
 			// Como la solicitud no ha sido descartada hasta ahora, se comprueba si va a ser descartada por mal funcionamiento de la aplicación. Probabilidad 15%.
 			if(calculaAleatorios(1, 20) <= 3){
-				solicitudRechazada(posicion);
+				sprintf(eventoSolicitud, "Descartada por mal funcionamiento de la aplicación.");
+				pthread_mutex_lock(&mutexLog);
+				writeLogMessage(identificadorSolicitud, eventoSolicitud);
+				pthread_mutex_unlock(&mutexLog);
+                         	solicitudRechazada(posicion);
 			}                
 			pthread_mutex_unlock(&mutexColaSolicitudes);
 		} else {
