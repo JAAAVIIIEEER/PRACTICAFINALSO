@@ -145,9 +145,9 @@ int main(int argc, char* argv[]) {
 	
 	// Creación hilos de los atendedores.
 	pthread_create(&coordinador, NULL, accionesCoordinadorSocial, NULL);	
-	for(aux = 0; aux < numeroAtendedores; aux++) {
+	for(aux = 0; aux < numeroAtendedores; ++aux) {
 		pthread_mutex_lock(&mutexColaSolicitudes);
-    		pthread_create(&atendedores, NULL, accionesAtendedor, (void*)&aux);
+    		pthread_create(&atendedores, NULL, accionesAtendedor, (void*)&aux);		
 	}
 	
 ////////////////////////////////////////
@@ -169,6 +169,11 @@ int main(int argc, char* argv[]) {
 		sleep(1);
 	}while(cont>0);
 	
+	do {
+		cont=0;
+		
+
+	}while(cont==4);
 	free(colaSolicitudes);
 	free(colaAtendedores);
 	exit(0);
@@ -182,14 +187,11 @@ void manejadoraAumentoSolicitudes(int sig) {
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	printf("Insertar nuevo numero de solicitudes : ");
 	scanf("%d",&numeroSolicitudes);
-	colaSolicitudes = (Solicitud *) realloc(colaSolicitudes, numeroSolicitudes);
+	colaSolicitudes = (Solicitud *) realloc(colaSolicitudes, numeroSolicitudes*sizeof(Solicitud));
 	for(aux; aux<numeroSolicitudes; aux++){
 		(*(colaSolicitudes + aux)).id = 0;
 		(*(colaSolicitudes + aux)).atendido = 0;
 		(*(colaSolicitudes + aux)).tipo = 0;	
-	}
-	for(int i=0; i<numeroSolicitudes;i++){
-		printf("%d %d %d\n", colaSolicitudes[i].id, colaSolicitudes[i].atendido, colaSolicitudes[i].tipo);
 	}
 	pthread_mutex_unlock(&mutexColaSocial);	
 	pthread_mutex_unlock(&mutexColaSolicitudes);
@@ -207,12 +209,9 @@ void manejadoraAumentoAtendedores(int sig) {
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	printf("Insertar nuevo numero de atendedores: ");
 	scanf("%d",&numeroAtendedores);
-	printf("HOLA B\n");
-	colaAtendedores = (Atendedor *) realloc(colaAtendedores, numeroAtendedores);
-	printf("HOLA A\n");
+	colaAtendedores = (Atendedor *) realloc(colaAtendedores, numeroAtendedores*sizeof(Atendedor));
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	sprintf(modificadoAtendedores, "Modificado a %d", numeroAtendedores);
-	printf("HOLA\n");
 	pthread_mutex_lock(&mutexLog);
 	writeLogMessage("Numero Atendedores", modificadoAtendedores);
 	pthread_mutex_unlock(&mutexLog);
@@ -287,8 +286,8 @@ void *accionesSolicitud(void *posEnCola){
 	pthread_mutex_unlock(&mutexLog);
 	// Se desbloquea el acceso a los logs.
 	while(1) {
-		// Se duerme el hilo solicitud 4 segundos.
-		sleep(4);
+		// Se duerme el hilo solicitud 3 segundos.
+		sleep(3);
 		// Se bloquea el acceso a la cola de solicitudes debido a que se lee. 
 		pthread_mutex_lock(&mutexColaSolicitudes);
 		// Si la solicitud no está siendo atendida en ese instante, se comprueba si va a ser descartada.
@@ -400,6 +399,7 @@ void solicitudTramitada(char *cad, char *cad1, int posicion){
 
 void *accionesAtendedor(void *posEnColaAtendedor) {
         int contadorVecesAtiende = 0, posEnColaSolicitud = 0, porcentaje = 0, flagAtendido = 0, tiempoDeAtencion = 0, posAtendedor = (*(int *)posEnColaAtendedor);
+	printf("HOLA ATENDEDOR %d\n", posAtendedor);
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	char * identificador = (char *) malloc((10 + numeroAtendedores) * sizeof(char));
 	sprintf(identificador, "Atendedor_%d", posAtendedor);
