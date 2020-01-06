@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
 	printf("%d\n", getpid());
 	int aux;
 	// Inicialización de variables locales, globales, condición y de los mutex.
-	numeroSolicitudes = 50000;
+	numeroSolicitudes = 15;
 	numeroAtendedores = 3;
 	if(argc == 2){	
 		numeroSolicitudes = atoi(argv[1]);
@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
 	
 	colaSolicitudes = (Solicitud*)malloc(numeroSolicitudes*sizeof(Solicitud));
 	colaAtendedores = (Atendedor*)malloc(numeroAtendedores*sizeof(Atendedor));
-   	fopen("hola.log", "w");
+   	fopen("Tsunami.log", "w");
 	contadorSolicitudes = 0;
 	contadorActividades = 0;
 	finalizar = 0;
@@ -105,12 +105,10 @@ int main(int argc, char* argv[]) {
         	exit(-1);
 	}
 
-///CAMBIAR ERA UNA PRUEBA
-int i;
-	for(i = 0; i < numeroSolicitudes; i++) {
-		colaSolicitudes[i].id = 0;
-		colaSolicitudes[i].atendido = 0;
-		colaSolicitudes[i].tipo = 0;
+	for(aux = 0; aux < numeroSolicitudes; aux++) {
+		(*(colaSolicitudes + aux)).id = 0;
+		(*(colaSolicitudes + aux)).atendido = 0;
+		(*(colaSolicitudes + aux)).tipo = 0;
 	}
 	
 	
@@ -159,21 +157,40 @@ int i;
 	while(finalizar != 1) { 
 		pause();
 	}
+	
+	int cont;
+	
+	do {
+		cont=0;
+		for(aux=0;aux<numeroSolicitudes;aux++){
+			if((*(colaSolicitudes+aux)).id>0)
+				cont++;
+		}
+		sleep(1);
+	}while(cont>0);
+	
 	free(colaSolicitudes);
 	free(colaAtendedores);
-
 	exit(0);
 	
 }
 // Función manejadora de la señal SIGPIPE.
 void manejadoraAumentoSolicitudes(int sig) {
-	int aux;
+	int aux = numeroSolicitudes;
 	char * modificadoSolicitudes = (char *)malloc(200 * sizeof(char));	
 	pthread_mutex_lock(&mutexColaSocial);	
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	printf("Insertar nuevo numero de solicitudes : ");
 	scanf("%d",&numeroSolicitudes);
 	colaSolicitudes = (Solicitud *) realloc(colaSolicitudes, numeroSolicitudes);
+	for(aux; aux<numeroSolicitudes; aux++){
+		(*(colaSolicitudes + aux)).id = 0;
+		(*(colaSolicitudes + aux)).atendido = 0;
+		(*(colaSolicitudes + aux)).tipo = 0;	
+	}
+	for(int i=0; i<numeroSolicitudes;i++){
+		printf("%d %d %d\n", colaSolicitudes[i].id, colaSolicitudes[i].atendido, colaSolicitudes[i].tipo);
+	}
 	pthread_mutex_unlock(&mutexColaSocial);	
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	sprintf(modificadoSolicitudes, "Modificado a %d", numeroSolicitudes);
@@ -185,22 +202,24 @@ void manejadoraAumentoSolicitudes(int sig) {
 // Función manejadora de la señal SIGTERM.
 void manejadoraAumentoAtendedores(int sig) {
 	pthread_t nuevosAtendedores;
-	int nuevoNumeroAtendedores,aux = numeroAtendedores;
+	int aux = numeroAtendedores;
 	char * modificadoAtendedores = (char *)malloc(200 * sizeof(char));	
 	pthread_mutex_lock(&mutexColaSolicitudes);
-	printf("Insertar nuevo numero de atendedores:\n");
-	scanf("%d",&nuevoNumeroAtendedores);
-	colaAtendedores = (Atendedor *) realloc(colaAtendedores, nuevoNumeroAtendedores);
-	numeroAtendedores=nuevoNumeroAtendedores;
+	printf("Insertar nuevo numero de atendedores: ");
+	scanf("%d",&numeroAtendedores);
+	printf("HOLA B\n");
+	colaAtendedores = (Atendedor *) realloc(colaAtendedores, numeroAtendedores);
+	printf("HOLA A\n");
+	pthread_mutex_unlock(&mutexColaSolicitudes);
 	sprintf(modificadoAtendedores, "Modificado a %d", numeroAtendedores);
+	printf("HOLA\n");
 	pthread_mutex_lock(&mutexLog);
 	writeLogMessage("Numero Atendedores", modificadoAtendedores);
 	pthread_mutex_unlock(&mutexLog);
-	for(aux; aux < nuevoNumeroAtendedores; aux++) {
+	for(aux; aux < numeroAtendedores; aux++) {
 		pthread_mutex_lock(&mutexColaSolicitudes);
     		pthread_create(&nuevosAtendedores, NULL, accionesAtendedor, (void*)&aux);
 	}
-	pthread_mutex_unlock(&mutexColaSolicitudes);
 }
 
 // Función manejadora de la señal SIGINT.
@@ -226,7 +245,7 @@ void *nuevaSolicitud(void *sig) {
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	posEspacioVacio = espacioEnColaSolicitudes();
 
-	if(posEspacioVacio != -1) {
+	if(posEspacioVacio != -1 && finalizar !=1) {
 		contadorSolicitudes++;   
 		(*(colaSolicitudes + posEspacioVacio)).id = contadorSolicitudes;
 		if(senal == SIGUSR1){
@@ -234,10 +253,10 @@ void *nuevaSolicitud(void *sig) {
 		} else {
 			(*(colaSolicitudes + posEspacioVacio)).tipo = 2; // En caso de que la señal tratada sea SIGUSR2 se pone el atributo tipo a 2.
 		}
-		pthread_t hiloSolicitud;
-		(*(colaSolicitudes + posEspacioVacio)).hilo = hiloSolicitud; 
+		pthread_t hiloSolicitud;	
  		// Se genera el hilo correspondiente con la variable local hiloSolicitud y se elimina el hilo provisional.
 		pthread_create(&hiloSolicitud, NULL, *accionesSolicitud, (void *)&posEspacioVacio);
+		(*(colaSolicitudes + posEspacioVacio)).hilo = hiloSolicitud; 
 		pthread_join(hiloSolicitud,NULL);
 		pthread_exit(NULL); 
 	} else {  
@@ -383,10 +402,10 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
         int contadorVecesAtiende = 0, posEnColaSolicitud = 0, porcentaje = 0, flagAtendido = 0, tiempoDeAtencion = 0, posAtendedor = (*(int *)posEnColaAtendedor);
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	char * identificador = (char *) malloc((10 + numeroAtendedores) * sizeof(char));
-	sprintf(identificador, "Atendedor_%d", posAtendedor + 1);
+	sprintf(identificador, "Atendedor_%d", posAtendedor);
 	char * evento = (char *) malloc(200 * sizeof(char));
 	
-    	while(finalizar != 1 || posEnColaSolicitud != -1) {
+    	while(1) {
 		posEnColaSolicitud = buscadorPorTipos(posAtendedor,evento);
 		if(posEnColaSolicitud == -1){
 			sleep(1);
@@ -598,7 +617,7 @@ void writeLogMessage(char *id, char *msg) {
 	char stnow[19];
 	strftime(stnow, 19, "%d/%m/%y %H:%M:%S", tlocal);
 	// Se escribe en el log. 
-	logFile = fopen("hola.log", "a");
+	logFile = fopen("Tsunami.log", "a");
 	fprintf(logFile, "[%s] %s: %s\n", stnow, id, msg);
 	fclose(logFile);
 	printf("[%s] %s: %s\n", stnow, id, msg);
