@@ -169,21 +169,24 @@ void manejadoraAumentoSolicitudes(int sig) {
 
 // Función manejadora de la señal SIGTERM.
 void manejadoraAumentoAtendedores(int sig) {
-	pthread_t nuevosAtendedores;
 	int aux = numeroAtendedores;
 	char * modificadoAtendedores = (char *)malloc(200 * sizeof(char));	
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	printf("Insertar nuevo numero de atendedores: ");
 	scanf("%d",&numeroAtendedores);
+	colaAtendedores = (Atendedor*)realloc(colaAtendedores, numeroAtendedores*sizeof(Atendedor));
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	sprintf(modificadoAtendedores, "Modificado a %d", numeroAtendedores);
 	pthread_mutex_lock(&mutexLog);
 	writeLogMessage("Numero Atendedores", modificadoAtendedores);
 	pthread_mutex_unlock(&mutexLog);
-	for(aux; aux < numeroAtendedores; aux++) {
+	pthread_mutex_lock(&mutexColaSolicitudes);
+	for(aux; aux < numeroAtendedores;) {
+		nuevoAtendedor(aux);
 		pthread_mutex_lock(&mutexColaSolicitudes);
-    		pthread_create(&nuevosAtendedores, NULL, accionesAtendedor, (void*)&aux);
+		aux++;
 	}
+	pthread_mutex_unlock(&mutexColaSolicitudes);
 }
 
 // Función manejadora de la señal SIGINT.
@@ -302,7 +305,7 @@ void *accionesSolicitud(void *posEnCola){
 					while(contadorActividades == 4) {
 						pthread_mutex_unlock(&mutexColaSocial);
 						sleep(1);
-						pthread_mutex_lock(&mutexColaSocial);
+						pthread_mutex_unlock(&mutexColaSocial);
 					}
 					//entra en la cola actividades
 
