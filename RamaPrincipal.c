@@ -71,6 +71,7 @@ int tiempoAtencion(char *evento, int porcentaje, int posEnColaSolicitud);
 int tipoDeAtencion (int porcentaje);
 int calculaAleatorios(int min, int max);
 void writeLogMessage(char *id, char *msg);
+pid_t gettid(void);
 
 // Función principal.
 int main(int argc, char* argv[]) {
@@ -614,8 +615,14 @@ int espacioEnColaSolicitudes() {
 
 // Función dedicada a calcular un número aleatorio comprendido entre un número y otro número.
 int calculaAleatorios(int min, int max) {
+	srand(gettid());
 	return rand() % (max - min + 1) + min;	
 }
+
+pid_t gettid(void) {
+	return syscall(__NR_gettid);
+} 
+
 
 // Función dedicada a escribir en log. Recibe como parámetros un identificador del mensaje log y el evento ocurrido.
 void writeLogMessage(char *id, char *msg) { 
