@@ -445,12 +445,13 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 			sleep(1);
 		} else {
 			porcentaje = calculaAleatorios(1, 100);
-			tiempoDeAtencion = tiempoAtencion(evento, porcentaje,posEnColaSolicitud);
 			flagAtendido = tipoDeAtencion(porcentaje);
 
 			pthread_mutex_lock(&mutexLog); 
 			writeLogMessage(identificador, evento);
 			pthread_mutex_unlock(&mutexLog);
+
+			tiempoDeAtencion = tiempoAtencion(evento, porcentaje,posEnColaSolicitud);	
 					
 			sleep(tiempoDeAtencion);
 
