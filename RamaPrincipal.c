@@ -162,10 +162,8 @@ int main(int argc, char* argv[]) {
 
 	
 	// Bucle en el cual se duerme al hilo principal 1 segundo constantemente hasta que algún atendedor detecta que todas las solicitudes han sido procesadas y que la cola esta vacia.
-	printf("%d\n", numeroAtendedores);
 	for(aux = 0; aux < numeroAtendedores; aux++) {
-    		pthread_join((*(colaAtendedores + aux)).hilo,0);
-		printf("HOLA\n");	
+    		pthread_join((*(colaAtendedores + aux)).hilo,NULL);	
 	}
 	pthread_mutex_destroy(&mutexColaAtendedores);
 	pthread_mutex_destroy(&mutexColaSocial);
@@ -321,15 +319,15 @@ void accionesSolicitud(int posicion){
 				writeLogMessage(identificadorSolicitud, eventoSolicitud);
 				pthread_mutex_unlock(&mutexLog);
                          	solicitudTramitadaRechazada(posicion);
-			}                
-			
-		} else {
-		
+			}
+		//En caso de que este siendo atendida la solicitud              			
+		} else {	
 			while((*(colaSolicitudes + posicion)).atendido == 1) {
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				sleep(1);
 				pthread_mutex_lock(&mutexColaSolicitudes);	
 			}
+			//En caso de que se pueda vincular a una actividad cultural
 			if((*(colaSolicitudes + posicion)).atendido == 2) {
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				sprintf(eventoSolicitud, "Solicitando vinculacion con la actividad cultural...");
@@ -337,32 +335,36 @@ void accionesSolicitud(int posicion){
 				writeLogMessage(identificadorSolicitud, eventoSolicitud);
 				pthread_mutex_unlock(&mutexLog);
 				int actividad = calculaAleatorios(1, 2);
+				//Si se vincula a una actividad cultural
 				if(actividad == 1) {
 					pthread_mutex_lock(&mutexColaSocial);
+					sprintf(eventoSolicitud, "Vinculada a la actividad cultural.");
+					pthread_mutex_lock(&mutexLog); 
+					writeLogMessage(identificadorSolicitud, eventoSolicitud);
+					pthread_mutex_unlock(&mutexLog);
 					while(contadorActividades == 4) {
 						pthread_mutex_unlock(&mutexColaSocial);
 						sleep(1);
 						pthread_mutex_lock(&mutexColaSocial);
 					}
-					//entra en la cola actividades
-
+					
+					//Entra en la cola actividades
+					pthread_mutex_unlock(&mutexColaSocial);
 					pthread_mutex_lock(&mutexColaSolicitudes);					
-					colaSocial[contadorActividades++].id = (*(colaSolicitudes + posicion)).id;		
-					sprintf(eventoSolicitud, "Vinculada a la actividad cultural.");
-					pthread_mutex_lock(&mutexLog); 
-					writeLogMessage(identificadorSolicitud, eventoSolicitud);
-					pthread_mutex_unlock(&mutexLog);
+					colaSocial[contadorActividades++].id = (*(colaSolicitudes + posicion)).id;
+					pthread_mutex_unlock(&mutexColaSolicitudes);		
 					if(contadorActividades==4){
 						pthread_cond_signal(&cond);
-					}
+					}				
+					pthread_mutex_lock(&mutexColaSocial);
+					while(contadorActividades!=4){
+						pthread_mutex_unlock(&mutexColaSocial);
+						sleep(1);
+						pthread_mutex_lock(&mutexColaSocial);
+					}	
 					pthread_mutex_unlock(&mutexColaSocial);
-  					(*(colaSolicitudes + posicion)).tipo=0;
-  					(*(colaSolicitudes + posicion)).id=0;
-  					(*(colaSolicitudes + posicion)).atendido=0;
-  					pthread_mutex_unlock(&mutexColaSolicitudes);
-					pthread_exit(NULL);
-
-			
+  					solicitudTramitadaRechazada(posicion);
+				//En caso de que no se vincule a una actividad cultural
 				} else {
 					sprintf(eventoSolicitud, "Tramitada sin actividad cultural.");
 					pthread_mutex_lock(&mutexLog);	
@@ -370,7 +372,8 @@ void accionesSolicitud(int posicion){
 					pthread_mutex_unlock(&mutexLog);
 					solicitudTramitadaRechazada(posicion);
 				}
-				
+
+			//En caso de que sea con antecedentes y no se pueda vincular			
 			} else if((*(colaSolicitudes + posicion)).atendido == 3) {
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				sprintf(eventoSolicitud, "Tramitada sin actividad cultural.");
@@ -404,7 +407,6 @@ void nuevoAtendedor(int posEnColaAtendedor) {
 
 void *accionesAtendedor(void *posEnColaAtendedor) {
         int contadorVecesAtiende = 0, posEnColaSolicitud = 0, porcentaje = 0, flagAtendido = 0, tiempoDeAtencion = 0, posAtendedor = (*(int *)posEnColaAtendedor)+1;
-	printf("HOLA ATENDEDOR %d\n", posAtendedor);
 	pthread_mutex_unlock(&mutexColaAtendedores);
 	char * identificador = (char *) malloc((10 + numeroAtendedores) * sizeof(char));
 	sprintf(identificador, "Atendedor_%d", posAtendedor);
@@ -545,7 +547,7 @@ int tiempoAtencion(char *evento, int porcentaje, int posEnColaSolicitud) {
 }
 
 
-
+//Funcion dedicada a desencadenar las actividades culturales.
 void *accionesCoordinadorSocial(){
 	pthread_t nuevoHilo;
 	while(1){
@@ -555,6 +557,7 @@ void *accionesCoordinadorSocial(){
 		pthread_mutex_lock(&mutexLog);
 		writeLogMessage("Actividad cultural", "Comenzando...");
 		pthread_mutex_unlock(&mutexLog);
+		//Creamos los hilos que desencadenarán la actividad cultural
 		for(i = 0; i < 4;i++) {
 			pthread_create(&nuevoHilo, NULL, actividadCultural, (void*)&colaSocial[i].id);
 		}
@@ -563,14 +566,12 @@ void *accionesCoordinadorSocial(){
 		writeLogMessage("Actividad cultural", "Finalizando...");
 		pthread_mutex_unlock(&mutexLog);
 		contadorActividades = 0;
-		int aux;
-		for(i = 0; i < 3; i++) {
-			colaSocial[i].id = 0;     		
-       		}	
+		int aux;	
 		pthread_mutex_unlock(&mutexColaSocial);
 	}
 }
 
+//Funcion dedicada a que cada hilo de actividad desencadene esta misma.
 void *actividadCultural(void *id){
 	char * identificador = malloc(80 * sizeof(char));
 	char * evento = malloc(80 * sizeof(char));
@@ -582,6 +583,7 @@ void *actividadCultural(void *id){
 	pthread_mutex_lock(&mutexLog); 
 	writeLogMessage(identificador, evento);
 	pthread_mutex_unlock(&mutexLog);
+	pthread_mutex_lock(&mutexColaSocial); 
 	for(i = 0; i < 4; i++) {
 		if(colaSocial[i].id == idAux){
 			colaSocial[i].id = 0;
@@ -595,6 +597,7 @@ void *actividadCultural(void *id){
 	if(contador == 4){
 		pthread_cond_signal(&cond);
 	}
+	pthread_mutex_unlock(&mutexColaSocial); 
 	pthread_exit(0);
 }
 
@@ -622,7 +625,7 @@ void writeLogMessage(char *id, char *msg) {
 	char stnow[19];
 	strftime(stnow, 19, "%d/%m/%y %H:%M:%S", tlocal);
 	// Se escribe en el log. 
-	logFile = fopen("Tsunami.log", "a");
+	logFile = fopen("registroTiempos.log", "a");
 	fprintf(logFile, "[%s] %s: %s\n", stnow, id, msg);
 	fclose(logFile);
 	printf("[%s] %s: %s\n", stnow, id, msg);
