@@ -142,7 +142,8 @@ int main(int argc, char* argv[]) {
     		pthread_join((*(colaAtendedores + aux)).hilo,NULL);	
 	}
 	free(colaSolicitudes);
-	exit(0);
+	free(colaAtendedores);
+	//exit(0);
 	
 }
 // Función manejadora de la señal SIGPIPE.
@@ -305,7 +306,7 @@ void *accionesSolicitud(void *posEnCola){
 					while(contadorActividades == 4) {
 						pthread_mutex_unlock(&mutexColaSocial);
 						sleep(1);
-						pthread_mutex_unlock(&mutexColaSocial);
+						pthread_mutex_lock(&mutexColaSocial);
 					}
 					//entra en la cola actividades
 
