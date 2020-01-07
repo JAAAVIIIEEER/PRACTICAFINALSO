@@ -365,10 +365,7 @@ void accionesSolicitud(int posicion){
 						pthread_mutex_lock(&mutexColaSocial);
 					}			
 					//Entra en la cola actividades
-					pthread_mutex_unlock(&mutexColaSocial);
-					pthread_mutex_lock(&mutexColaSolicitudes);
-					//Se setea un flag para saber que esta esperando para entrar a una actividad
-					pthread_mutex_lock(&mutexColaSocial);				
+					pthread_mutex_lock(&mutexColaSolicitudes);			
 					colaSocial[contadorActividades++].id = (*(colaSolicitudes + posicion)).id;
 					pthread_mutex_unlock(&mutexColaSocial);
 					pthread_mutex_unlock(&mutexColaSolicitudes);		
