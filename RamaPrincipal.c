@@ -68,7 +68,6 @@ int tiempoAtencion(char *evento, int porcentaje, int posEnColaSolicitud);
 int tipoDeAtencion (int porcentaje);
 int calculaAleatorios(int min, int max);
 void writeLogMessage(char *id, char *msg);
-pid_t gettid(void);
 
 // Función principal.
 int main(int argc, char* argv[]) {
@@ -171,9 +170,6 @@ int main(int argc, char* argv[]) {
 			//Si el id es mayor que 0 es que hay una solicitud
     			if((*(colaSolicitudes+aux)).id>0)
 				cont++;
-			//Si el flag es 4 entonces estará esperando para una actividad por tanto ya ha sido procesada
-			if((*(colaSolicitudes + aux)).atendido==4)
-				cont--;
 		}
 		sleep(1);
 	}while(cont>0);
@@ -367,13 +363,11 @@ void accionesSolicitud(int posicion){
 						pthread_mutex_unlock(&mutexColaSocial);
 						sleep(1);
 						pthread_mutex_lock(&mutexColaSocial);
-					}
-					
+					}			
 					//Entra en la cola actividades
 					pthread_mutex_unlock(&mutexColaSocial);
 					pthread_mutex_lock(&mutexColaSolicitudes);
 					//Se setea un flag para saber que esta esperando para entrar a una actividad
-					(*(colaSolicitudes + posicion)).atendido=4;
 					pthread_mutex_lock(&mutexColaSocial);				
 					colaSocial[contadorActividades++].id = (*(colaSolicitudes + posicion)).id;
 					pthread_mutex_unlock(&mutexColaSocial);
@@ -381,13 +375,6 @@ void accionesSolicitud(int posicion){
 					if(contadorActividades==4){
 						pthread_cond_signal(&cond);
 					}				
-					pthread_mutex_lock(&mutexColaSocial);
-					while(contadorActividades!=4){
-						pthread_mutex_unlock(&mutexColaSocial);
-						sleep(1);
-						pthread_mutex_lock(&mutexColaSocial);
-					}	
-					pthread_mutex_unlock(&mutexColaSocial);
   					solicitudTramitadaRechazada(posicion);
 				//En caso de que no se vincule a una actividad cultural
 				} else {
@@ -605,7 +592,7 @@ void *actividadCultural(void *id){
 	int i, contador=0;
 	sleep(3);
 	sprintf(evento, "Fin actividad cultural");
-	sprintf(identificador, "Solicitud %d", idAux);
+	sprintf(identificador, "Solicitud_%d", idAux);
 	pthread_mutex_lock(&mutexLog); 
 	writeLogMessage(identificador, evento);
 	pthread_mutex_unlock(&mutexLog);
@@ -631,14 +618,9 @@ void *actividadCultural(void *id){
 
 // Función dedicada a calcular un número aleatorio comprendido entre un número y otro número.
 int calculaAleatorios(int min, int max) {
-	srand(gettid());
+	srand(time(NULL));
 	return rand() % (max - min + 1) + min;	
 }
-
-//Función dedicada a devolver el TID del hilo
-pid_t gettid(void) {
-	return syscall(__NR_gettid);
-} 
 
 
 // Función dedicada a escribir en log. Recibe como parámetros un identificador del mensaje log y el evento ocurrido.
