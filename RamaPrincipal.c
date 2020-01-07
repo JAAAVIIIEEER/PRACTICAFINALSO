@@ -257,12 +257,13 @@ void *nuevaSolicitud(void *sig) {
 	if(posEspacioVacio != -1 && finalizar !=1) {
 		contadorSolicitudes++;   
 		(*(colaSolicitudes + posEspacioVacio)).id = contadorSolicitudes;
-		pthread_mutex_unlock(&mutexColaSolicitudes);
+		
 		if(senal == SIGUSR1){
 			(*(colaSolicitudes + posEspacioVacio)).tipo = 1; // En caso de que la señal tratada sea SIGUSR1 se pone el atributo tipo a 1.
 		} else {
 			(*(colaSolicitudes + posEspacioVacio)).tipo = 2; // En caso de que la señal tratada sea SIGUSR2 se pone el atributo tipo a 2.
 		}
+		pthread_mutex_unlock(&mutexColaSolicitudes);
 		accionesSolicitud(posEspacioVacio);
 		pthread_exit(NULL); 
 	} else {  
