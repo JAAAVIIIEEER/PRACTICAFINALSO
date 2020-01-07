@@ -257,6 +257,7 @@ void *accionesSolicitud(void *posEnCola){
    		if((*(colaSolicitudes + posicion)).atendido == 0) {
 			// Se comprueba si la solicitud de tipo invitación va a ser descartada por cansarse de esperar. Probabilidad 10%.
 			if((*(colaSolicitudes + posicion)).tipo == 1) {
+				pthread_mutex_unlock(&mutexColaSolicitudes);
 				if(calculaAleatorios(1, 10) == 1) {
 					sprintf(eventoSolicitud, "Descartada del sistema por cansarse de esperar.");
 					pthread_mutex_lock(&mutexLog);
@@ -267,6 +268,7 @@ void *accionesSolicitud(void *posEnCola){
 			}
 			// Se comprueba si la solicitud de tipo QR va a ser descartada por no considerarse fiable. Probabilidad 30%.
 			if((*(colaSolicitudes + posicion)).tipo == 2) {
+				pthread_mutex_unlock(&mutexColaSolicitudes);
 				if(calculaAleatorios(1, 10) <= 3){
 					sprintf(eventoSolicitud, "Descartada del sistema por no considerarse fiable.");
 					pthread_mutex_lock(&mutexLog);
@@ -283,7 +285,7 @@ void *accionesSolicitud(void *posEnCola){
 				pthread_mutex_unlock(&mutexLog);
                          	solicitudRechazada(posicion);
 			}                
-			pthread_mutex_unlock(&mutexColaSolicitudes);
+			
 		} else {
 		
 			while((*(colaSolicitudes + posicion)).atendido == 1) {
@@ -295,11 +297,14 @@ void *accionesSolicitud(void *posEnCola){
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				int actividad = calculaAleatorios(1, 2);
 				if(actividad == 1) {
+					pthread_mutex_lock(&mutexColaSocial);
 					while(contadorActividades == 4) {
+						pthread_mutex_unlock(&mutexColaSocial);
 						sleep(1);
+						pthread_mutex_unlock(&mutexColaSocial);
 					}
 					//entra en la cola actividades
-					pthread_mutex_lock(&mutexColaSocial);
+
 					pthread_mutex_lock(&mutexColaSolicitudes);					
 					colaSocial[contadorActividades++].id = (*(colaSolicitudes + posicion)).id;		
 					sprintf(eventoSolicitud, "Preparado Actividad");
