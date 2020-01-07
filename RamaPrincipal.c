@@ -132,6 +132,7 @@ int main(int argc, char* argv[]) {
 		pthread_mutex_lock(&mutexColaSolicitudes);
 		aux++;	
 	}
+	pthread_mutex_unlock(&mutexColaSolicitudes);
 	// Bucle de señales recibidas hasta que la manejadora de la señal SIGINT cambia el valor de la variable finalizar a 1.
 	while(finalizar != 1) { 
 		pause();
@@ -372,7 +373,7 @@ void nuevoAtendedor(int posEnColaAtendedor) {
 }
 
 void *accionesAtendedor(void *posEnColaAtendedor) {
-        int contadorVecesAtiende = 0, posEnColaSolicitud = 0, porcentaje = 0, flagAtendido = 0, tiempoDeAtencion = 0, posAtendedor = (*(int *)posEnColaAtendedor);
+        int contadorVecesAtiende = 0, posEnColaSolicitud = 0, porcentaje = 0, flagAtendido = 0, tiempoDeAtencion = 0, posAtendedor = (*(int *)posEnColaAtendedor)+1;
 	printf("HOLA ATENDEDOR %d\n", posAtendedor);
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	char * identificador = (char *) malloc((10 + numeroAtendedores) * sizeof(char));
@@ -595,4 +596,3 @@ void writeLogMessage(char *id, char *msg) {
 	fclose(logFile);
 	printf("[%s] %s: %s\n", stnow, id, msg);
 }
-
