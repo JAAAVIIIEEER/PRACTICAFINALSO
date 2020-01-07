@@ -302,7 +302,7 @@ void *accionesSolicitud(void *posEnCola){
 					while(contadorActividades == 4) {
 						pthread_mutex_unlock(&mutexColaSocial);
 						sleep(1);
-						pthread_mutex_unlock(&mutexColaSocial);
+						pthread_mutex_lock(&mutexColaSocial);
 					}
 					//entra en la cola actividades
 
