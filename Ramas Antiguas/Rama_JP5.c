@@ -59,7 +59,6 @@ void writeLogMessage(char *id, char *msg);
 int main(int argc, char* argv[]) {
 	// Declaración variables locales de la función principal.
 	pthread_t atendedores,coordinador;
-	printf("%d\n", getpid());
 	int aux;
 	// Inicialización de variables locales, globales, condición y de los mutex.
 	numeroSolicitudes = 15;
@@ -157,11 +156,6 @@ int main(int argc, char* argv[]) {
 		sleep(1);
 	}while(cont>0);
 	
-	do {
-		cont=0;
-		
-
-	}while(cont==4);
 	free(colaSolicitudes);
 	exit(0);
 	
@@ -385,12 +379,11 @@ void solicitudTramitada(char *cad, char *cad1, int posicion){
 
 void *accionesAtendedor(void *posEnColaAtendedor) {
         int contadorVecesAtiende = 0, posEnColaSolicitud = 0, porcentaje = 0, flagAtendido = 0, tiempoDeAtencion = 0, posAtendedor = (*(int *)posEnColaAtendedor);
-	printf("HOLA ATENDEDOR %d\n", posAtendedor);
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	char * identificador = (char *) malloc((10 + numeroAtendedores) * sizeof(char));
 	sprintf(identificador, "Atendedor_%d", posAtendedor);
 	char * evento = (char *) malloc(200 * sizeof(char));
-	
+
     	while(1) {
 		posEnColaSolicitud = buscadorPorTipos(posAtendedor,evento);
 		if(posEnColaSolicitud == -1){
