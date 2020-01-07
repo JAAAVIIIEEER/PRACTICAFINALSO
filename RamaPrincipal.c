@@ -10,36 +10,34 @@
 #include <pthread.h> 
 #include <string.h>
 
-// Declaración variables globales.
-
+// Declaración de variables globales.
 pthread_mutex_t mutexColaSolicitudes;
 pthread_mutex_t mutexColaSocial;
 pthread_mutex_t mutexLog;
 pthread_cond_t cond;
-
 typedef struct {
 	int id;
 	int atendido;
 	int tipo;
-	pthread_t hilo;
 } Solicitud;
-
 typedef struct {
  	int id; 
 } Social;
-
+typedef struct {
+	pthread_t hilo;
+} Atendedor;
+Atendedor  * colaAtendedores;
 Solicitud * colaSolicitudes;
 Social colaSocial[4];
-
 FILE * logFile;
-
 int contadorSolicitudes, contadorActividades, finalizar, numeroSolicitudes, numeroAtendedores;
 
-// Declaración funciones auxiliares.
+// Declaración de funciones auxiliares.
 void manejadoraNuevaSolicitud(int sig);
 void manejadoraTerminar(int sig);
 void manejadoraAumentoAtendedores(int sig);
 void manejadoraAumentoSolicitudes(int sig);
+void nuevoAtendedor(int posEnColaAtendedor);
 void *nuevaSolicitud(void *sig);
 void *accionesCoordinadorSocial();
 void *accionesAtendedor(void *tipoDeAtendedor);
@@ -57,26 +55,26 @@ void writeLogMessage(char *id, char *msg);
 
 // Función principal.
 int main(int argc, char* argv[]) {
-	// Declaración variables locales de la función principal.
-	pthread_t atendedores,coordinador;
+	// Declaración de variables locales de la función principal.
+	pthread_t coordinador;
 	printf("%d\n", getpid());
 	int aux;
 	// Inicialización de variables locales, globales, condición y de los mutex.
 	numeroSolicitudes = 15;
 	numeroAtendedores = 3;
+	contadorSolicitudes = 0;
+	contadorActividades = 0;
+	finalizar = 0;
+	logFile = NULL;	
+	fopen("Tsunami.log", "w");
 	if(argc == 2){	
 		numeroSolicitudes = atoi(argv[1]);
 	} else if (argc == 3){
 		numeroSolicitudes = atoi(argv[1]);
 		numeroAtendedores = atoi(argv[2]);
 	}
-	
 	colaSolicitudes = (Solicitud*)malloc(numeroSolicitudes*sizeof(Solicitud));
-   	fopen("Tsunami.log", "w");
-	contadorSolicitudes = 0;
-	contadorActividades = 0;
-	finalizar = 0;
-	logFile = NULL;	
+	colaAtendedores = (Atendedor*)malloc(numeroAtendedores*sizeof(Atendedor));
 	struct sigaction solicitudes = {0};
 	solicitudes.sa_handler =  manejadoraNuevaSolicitud;
 	struct sigaction terminar = {0};
@@ -97,18 +95,14 @@ int main(int argc, char* argv[]) {
 	if(pthread_cond_init(&cond, NULL) != 0) {
         	exit(-1);
 	}
-
 	for(aux = 0; aux < numeroSolicitudes; aux++) {
 		(*(colaSolicitudes + aux)).id = 0;
 		(*(colaSolicitudes + aux)).atendido = 0;
 		(*(colaSolicitudes + aux)).tipo = 0;
-	}
-	
-	
+	}	
 	for(aux = 0; aux < 4; aux++) {
 		colaSocial[aux].id = 0;
 	}
-
 	// Tratamiento de las señales recibidas mediante sigaction.
 	if(-1 == sigaction(SIGUSR2,&solicitudes,NULL)) {
 		perror("Error en el sigaction que recoge la señal SIGUSR2.");
@@ -130,38 +124,22 @@ int main(int argc, char* argv[]) {
 		perror("Error en el sigaction que recoge la señal SIGPIPE.");
 		exit(-1);
 	}
-	
-	// Creación hilos de los atendedores.
-	pthread_create(&coordinador, NULL, accionesCoordinadorSocial, NULL);	
-	for(aux = 0; aux < numeroAtendedores; ++aux) {
+	// Creación hilos de los atendedores y del coordinador social.
+	pthread_create(&coordinador, NULL, accionesCoordinadorSocial, NULL);
+	pthread_mutex_lock(&mutexColaSolicitudes);	
+	for(aux = 0; aux < numeroAtendedores;) {
+    		nuevoAtendedor(aux);
 		pthread_mutex_lock(&mutexColaSolicitudes);
-    		pthread_create(&atendedores, NULL, accionesAtendedor, (void*)&aux);		
+		aux++;	
 	}
-	
-////////////////////////////////////////
-	//// FALTAN JOINNSSSSSSSSS ///////
-///////////////////////////////////////////
 	// Bucle de señales recibidas hasta que la manejadora de la señal SIGINT cambia el valor de la variable finalizar a 1.
 	while(finalizar != 1) { 
 		pause();
 	}
-	
-	int cont;
-	
-	do {
-		cont=0;
-		for(aux=0;aux<numeroSolicitudes;aux++){
-			if((*(colaSolicitudes+aux)).id>0)
-				cont++;
-		}
-		sleep(1);
-	}while(cont>0);
-	
-	do {
-		cont=0;
-		
-
-	}while(cont==4);
+	// Bucle en el cual se duerme al hilo principal 1 segundo constantemente hasta que algún atendedor detecta que todas las solicitudes han sido procesadas y que la cola esta vacia.
+	for(aux = 0; aux < numeroAtendedores; aux++) {
+    		pthread_join((*(colaAtendedores + aux)).hilo,NULL);	
+	}
 	free(colaSolicitudes);
 	exit(0);
 	
@@ -241,7 +219,6 @@ void *nuevaSolicitud(void *sig) {
 		pthread_t hiloSolicitud;	
  		// Se genera el hilo correspondiente con la variable local hiloSolicitud y se elimina el hilo provisional.
 		pthread_create(&hiloSolicitud, NULL, *accionesSolicitud, (void *)&posEspacioVacio);
-		(*(colaSolicitudes + posEspacioVacio)).hilo = hiloSolicitud; 
 		pthread_join(hiloSolicitud,NULL);
 		pthread_exit(NULL); 
 	} else {  
@@ -383,6 +360,12 @@ void solicitudTramitada(char *cad, char *cad1, int posicion){
 	//pasar a la cola de actividades
 }
 
+void nuevoAtendedor(int posEnColaAtendedor) {
+	pthread_t nuevoAtendedor;
+	(*(colaAtendedores + posEnColaAtendedor)).hilo = nuevoAtendedor;	
+	pthread_create(&nuevoAtendedor, NULL, accionesAtendedor, (void*)&posEnColaAtendedor);		
+}
+
 void *accionesAtendedor(void *posEnColaAtendedor) {
         int contadorVecesAtiende = 0, posEnColaSolicitud = 0, porcentaje = 0, flagAtendido = 0, tiempoDeAtencion = 0, posAtendedor = (*(int *)posEnColaAtendedor);
 	printf("HOLA ATENDEDOR %d\n", posAtendedor);
@@ -391,7 +374,7 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 	sprintf(identificador, "Atendedor_%d", posAtendedor);
 	char * evento = (char *) malloc(200 * sizeof(char));
 	
-    	while(1) {
+    	while(finalizar != 1 || posEnColaSolicitud != -1) {
 		posEnColaSolicitud = buscadorPorTipos(posAtendedor,evento);
 		if(posEnColaSolicitud == -1){
 			sleep(1);
@@ -427,6 +410,7 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 			}		
 		}      
    	}
+	pthread_exit(NULL);
 }
 
 // Función dedicada a calcular el tipo de atención para cada solicitud según el porcentaje. En solo un 10% de los casos devolverá un valor de 3 lo cual indica que la solicitud tiene antecedentes. 
