@@ -444,13 +444,13 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 		if(posEnColaSolicitud == -1){
 			sleep(1);
 		} else {
-			pthread_mutex_lock(&mutexLog); 
-			writeLogMessage(identificador, evento);
-			pthread_mutex_unlock(&mutexLog);
-
 			porcentaje = calculaAleatorios(1, 100);
 			tiempoDeAtencion = tiempoAtencion(evento, porcentaje,posEnColaSolicitud);
 			flagAtendido = tipoDeAtencion(porcentaje);
+
+			pthread_mutex_lock(&mutexLog); 
+			writeLogMessage(identificador, evento);
+			pthread_mutex_unlock(&mutexLog);
 					
 			sleep(tiempoDeAtencion);
 
@@ -475,7 +475,7 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 			}		
 		}      
    	}
-	pthread_exit(0);
+	pthread_exit(NULL);
 }
 
 // Función dedicada a calcular el tipo de atención para cada solicitud según el porcentaje. En solo un 10% de los casos devolverá un valor de 3 lo cual indica que la solicitud tiene antecedentes y no puede intentar entrar en una actividad. 
@@ -592,7 +592,6 @@ void *accionesCoordinadorSocial(){
 		writeLogMessage("Actividad cultural", "Finalizando...");
 		pthread_mutex_unlock(&mutexLog);
 		contadorActividades = 0;
-		int aux;	
 		pthread_mutex_unlock(&mutexColaSocial);
 	}
 }
@@ -624,7 +623,7 @@ void *actividadCultural(void *id){
 		pthread_cond_signal(&cond);
 	}
 	pthread_mutex_unlock(&mutexColaSocial); 
-	pthread_exit(0);
+	pthread_exit(NULL);
 }
 
 
