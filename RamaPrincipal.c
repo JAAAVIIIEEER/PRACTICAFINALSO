@@ -138,14 +138,16 @@ int main(int argc, char* argv[]) {
 		pause();
 	}
 	// Bucle en el cual se duerme al hilo principal 1 segundo constantemente hasta que algún atendedor detecta que todas las solicitudes han sido procesadas y que la cola esta vacia.
+	printf("%d\n", numeroAtendedores);
 	for(aux = 0; aux < numeroAtendedores; aux++) {
-    		pthread_join((*(colaAtendedores + aux)).hilo,NULL);	
+    		pthread_join((*(colaAtendedores + aux)).hilo,0);
+		printf("HOLA\n");	
 	}
-	free(colaSolicitudes);
-	free(colaAtendedores);
-	//exit(0);
 	
+	free(colaSolicitudes);
+	free(colaAtendedores);	
 }
+
 // Función manejadora de la señal SIGPIPE.
 void manejadoraAumentoSolicitudes(int sig) {
 	int aux = numeroSolicitudes;
@@ -199,7 +201,6 @@ void manejadoraTerminar(int sig) {
 void manejadoraNuevaSolicitud(int sig) {
 	pthread_t hiloProvisional;
 	// Solicitamos acceso a la cola colaSolicitudes y bloqueamos para proteger la posición de memoria de la variable sig.
-	pthread_mutex_lock(&mutexColaSolicitudes);
 	// Se genera un hilo provisional independientemente de si hay espacio en la cola de solicitudes o no. El hilo "padre" vuelve rápidamente a esperar por más señales a la función principal.
 	pthread_create(&hiloProvisional, NULL, nuevaSolicitud, (void *)&sig); 
 }
@@ -208,7 +209,7 @@ void manejadoraNuevaSolicitud(int sig) {
 void *nuevaSolicitud(void *sig) {
 	int senal = (*(int *)sig);
 	int posEspacioVacio;
-	pthread_mutex_unlock(&mutexColaSolicitudes);
+
 	// Comprobación espacio libre en cola, en caso AFIRMATIVO el método isEspacioEnColaSolicitudes() devuelve la posición del espacio libre, por el contrario devuelve el valor -1, no entrando en el if y saliendo del metódo tras desbloquear el mutex.
 	pthread_mutex_lock(&mutexColaSolicitudes);
 	posEspacioVacio = espacioEnColaSolicitudes();
@@ -420,7 +421,7 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 			}		
 		}      
    	}
-	pthread_exit(NULL);
+	pthread_exit(0);
 }
 
 // Función dedicada a calcular el tipo de atención para cada solicitud según el porcentaje. En solo un 10% de los casos devolverá un valor de 3 lo cual indica que la solicitud tiene antecedentes. 
