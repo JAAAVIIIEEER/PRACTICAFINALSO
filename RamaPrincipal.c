@@ -43,10 +43,7 @@ typedef struct {
 typedef struct {
  	int id; 
 } Social;
-typedef struct {
-	pthread_t hilo;
-} Atendedor;
-Atendedor  * colaAtendedores;
+
 Solicitud * colaSolicitudes;
 Social colaSocial[4];
 FILE * logFile;
@@ -87,14 +84,16 @@ int main(int argc, char* argv[]) {
 	finalizar = 0;
 	logFile = NULL;	
 	fopen("registroTiempos.log", "w");
-	if(argc == 2){	
-		numeroSolicitudes = atoi(argv[1]);
-	} else if (argc == 3){
+	
+	//En caso de que sea el argumento el numero de solicitudes y atendedores
+	if (argc == 3){
 		numeroSolicitudes = atoi(argv[1]);
 		numeroAtendedores = atoi(argv[2]);
 	}
+
 	colaSolicitudes = (Solicitud*)malloc(numeroSolicitudes*sizeof(Solicitud));
-	colaAtendedores = (Atendedor*)malloc(numeroAtendedores*sizeof(Atendedor));
+
+	//Inicilizamos las estructuras sigaction
 	struct sigaction solicitudes = {0};
 	solicitudes.sa_handler =  manejadoraNuevaSolicitud;
 	struct sigaction terminar = {0};
@@ -103,6 +102,8 @@ int main(int argc, char* argv[]) {
 	nuevosAtendedores.sa_handler = manejadoraAumentoAtendedores;
 	struct sigaction nuevasSolicitudes = {0};
 	nuevasSolicitudes.sa_handler = manejadoraAumentoSolicitudes;
+
+	//Inicilizamos las variables globales
 	if(pthread_mutex_init(&mutexColaSolicitudes,NULL) != 0) {
 		exit(-1);
 	}
@@ -163,15 +164,25 @@ int main(int argc, char* argv[]) {
 
 	
 	// Bucle en el cual se duerme al hilo principal 1 segundo constantemente hasta que algún atendedor detecta que todas las solicitudes han sido procesadas y que la cola esta vacia.
-	for(aux = 0; aux < numeroAtendedores; aux++) {
-    		pthread_join((*(colaAtendedores + aux)).hilo,NULL);	
-	}
+	int cont;
+	do{
+		cont=0;
+		//Analizamos la cola de solicitudes
+		for(aux = 0; aux < numeroSolicitudes; aux++) {
+			//Si el id es mayor que 0 es que hay una solicitud
+    			if((*(colaSolicitudes+aux)).id>0)
+				cont++;
+			//Si el flag es 4 entonces estará esperando para una actividad por tanto ya ha sido procesada
+			if((*(colaSolicitudes + aux)).atendido==4)
+				cont--;
+		}
+		sleep(1);
+	}while(cont>0);
 	pthread_mutex_destroy(&mutexColaAtendedores);
 	pthread_mutex_destroy(&mutexColaSocial);
 	pthread_mutex_destroy(&mutexColaSolicitudes);
 	pthread_mutex_destroy(&mutexLog);
-	free(colaSolicitudes);
-	free(colaAtendedores);	
+	free(colaSolicitudes);	
 }
 
 // Función manejadora de la señal SIGPIPE. Dedicada a poder aumentar la cola de solicitudes.
@@ -203,17 +214,13 @@ void manejadoraAumentoSolicitudes(int sig) {
 void manejadoraAumentoAtendedores(int sig) {
 	int aux = numeroAtendedores;
 	char * modificadoAtendedores = (char *)malloc(200 * sizeof(char));
-	
-	pthread_mutex_lock(&mutexColaSolicitudes);
 	pthread_mutex_lock(&mutexColaAtendedores);
 	pthread_mutex_lock(&mutexLog);
 	printf("\033[1;32m");
 	printf("Insertar nuevo numero de atendedores: \n");
 	printf("\033[0m");
 	scanf("%d",&numeroAtendedores);
-	colaAtendedores = (Atendedor*)realloc(colaAtendedores, numeroAtendedores*sizeof(Atendedor));
 	pthread_mutex_unlock(&mutexColaAtendedores);
-	pthread_mutex_unlock(&mutexColaSolicitudes);
 	pthread_mutex_unlock(&mutexLog);
 	sprintf(modificadoAtendedores, "Modificado a %d atendedores.", numeroAtendedores);
 	pthread_mutex_lock(&mutexLog);
@@ -266,13 +273,13 @@ void *nuevaSolicitud(void *sig) {
 	
 }
 
+//Funcion que gestiona la solicitud en caso de que tenga espacio en la cola
 void accionesSolicitud(int posicion){
 	char * identificadorSolicitud = (char *)malloc((numeroSolicitudes + 10)* sizeof(char));
 	char * eventoSolicitud = (char *)malloc(200 * sizeof(char));
 	// Se indica que una nueva solicitud ha sido añadida en la cola.
 	sprintf(identificadorSolicitud, "Solicitud_%d", (*(colaSolicitudes + posicion)).id);
 	sprintf(eventoSolicitud, "Registrada en la cola de solicitudes. ");
-	
 	if((*(colaSolicitudes + posicion)).tipo == 1){
 		strcat(eventoSolicitud, "Tipo de solicitud: Invitacion.");
 	} else {
@@ -351,7 +358,9 @@ void accionesSolicitud(int posicion){
 					
 					//Entra en la cola actividades
 					pthread_mutex_unlock(&mutexColaSocial);
-					pthread_mutex_lock(&mutexColaSolicitudes);					
+					pthread_mutex_lock(&mutexColaSolicitudes);
+					//Se setea un flag para saber que esta esperando para entrar a una actividad
+					(*(colaSolicitudes + posicion)).atendido=4;					
 					colaSocial[contadorActividades++].id = (*(colaSolicitudes + posicion)).id;
 					pthread_mutex_unlock(&mutexColaSolicitudes);		
 					if(contadorActividades==4){
@@ -390,6 +399,7 @@ void accionesSolicitud(int posicion){
 
 }
 
+//Funcion que se encarga de liberar el espacio en la cola de solicitudes
 void solicitudTramitadaRechazada(int posicion) {
   	pthread_mutex_lock(&mutexColaSolicitudes);
   	(*(colaSolicitudes + posicion)).tipo=0;
@@ -399,13 +409,14 @@ void solicitudTramitadaRechazada(int posicion) {
   	pthread_exit(NULL);
 }
 
-//
+//Funcion que se encarga de crear nuevos atendedores
 void nuevoAtendedor(int posEnColaAtendedor) {
 	pthread_t nuevoAtendedor;
-	(*(colaAtendedores + posEnColaAtendedor)).hilo = nuevoAtendedor;	
 	pthread_create(&nuevoAtendedor, NULL, accionesAtendedor, (void*)&posEnColaAtendedor);		
 }
 
+
+//Funcion encargada de hacer que los atendedores atiendan las solicitudes
 void *accionesAtendedor(void *posEnColaAtendedor) {
         int contadorVecesAtiende = 0, posEnColaSolicitud = 0, porcentaje = 0, flagAtendido = 0, tiempoDeAtencion = 0, posAtendedor = (*(int *)posEnColaAtendedor)+1;
 	pthread_mutex_unlock(&mutexColaAtendedores);
@@ -619,6 +630,7 @@ int calculaAleatorios(int min, int max) {
 	return rand() % (max - min + 1) + min;	
 }
 
+//Función dedicada a devolver el TID del hilo
 pid_t gettid(void) {
 	return syscall(__NR_gettid);
 } 
