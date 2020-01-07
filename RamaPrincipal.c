@@ -74,7 +74,6 @@ pid_t gettid(void);
 int main(int argc, char* argv[]) {
 	// Declaración de variables locales de la función principal.
 	pthread_t coordinador;
-	printf("%d\n", getpid());
 	int aux;
 	// Inicialización de variables locales, globales, condición y de los mutex.
 	numeroSolicitudes = 15;
