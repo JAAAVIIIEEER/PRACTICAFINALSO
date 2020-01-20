@@ -18,7 +18,7 @@
  *			   JAVIER RENERO BALGAÑÓN
  *			   CARLOS DÍEZ GUTIÉRREZ
  * 
- *        ------------------------------------------------------------------------
+ *    ------------------------------------------------------------------------
  *	  -                           PARTE OPCIONAL                             -
  *	  ------------------------------------------------------------------------
  *	  PRIMER ARGUMENTO : NÚMERO MAXIMO DE SOLICITUDES
@@ -115,9 +115,10 @@ int main(int argc, char* argv[]) {
 		exit(-1);
 	}
 	if(pthread_cond_init(&cond, NULL) != 0) {
-        	exit(-1);
+        exit(-1);
 	}
 	for(aux = 0; aux < numeroSolicitudes; aux++) {
+		//colaSolicitudes[aux].id = 0;
 		(*(colaSolicitudes + aux)).id = 0;
 		(*(colaSolicitudes + aux)).atendido = 0;
 		(*(colaSolicitudes + aux)).tipo = 0;
@@ -159,8 +160,6 @@ int main(int argc, char* argv[]) {
 	while(finalizar != 1) { 
 		pause();
 	}
-
-	
 	// Bucle en el cual se duerme al hilo principal 1 segundo constantemente hasta que se detecta que todas las solicitudes han sido procesadas.
 	int cont;
 	do{
