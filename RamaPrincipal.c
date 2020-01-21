@@ -206,7 +206,26 @@ void manejadoraAumentoSolicitudes(int sig) {
 // Función manejadora de la señal SIGTERM. Dedicada a poder aumentar los atendedores disponibles, siendo estos nuevos de tipo PRO.
 void manejadoraAumentoAtendedores(int sig) {
 	int aux = numeroAtendedores;
+	int auxSol = numeroSolicitudes;
 	char * modificadoAtendedores = (char *)malloc(200 * sizeof(char));
+	char * modificadoSolicitudes = (char *)malloc(200 * sizeof(char));
+
+	pthread_mutex_lock(&mutexColaSolicitudes);
+	printf("\033[1;32m");
+	printf("Insertar nuevo numero de solicitudes: \n");
+	printf("\033[0m");
+	scanf("%d",&numeroSolicitudes);
+	colaSolicitudes = (Solicitud *) realloc(colaSolicitudes, numeroSolicitudes*sizeof(Solicitud));
+	for(auxSol; auxSol<numeroSolicitudes; auxSol++){
+		(*(colaSolicitudes + auxSol)).id = 0;
+		(*(colaSolicitudes + auxSol)).atendido = 0;
+		(*(colaSolicitudes + auxSol)).tipo = 0;	
+	}
+	pthread_mutex_unlock(&mutexColaSolicitudes);
+	sprintf(modificadoSolicitudes, "Modificado a %d solicitudes.", numeroSolicitudes);
+	pthread_mutex_lock(&mutexLog);
+	writeLogMessage("Numero Solicitudes", modificadoSolicitudes);
+	pthread_mutex_unlock(&mutexLog);
 
 	pthread_mutex_lock(&mutexColaAtendedores);
 	printf("\033[1;32m");
