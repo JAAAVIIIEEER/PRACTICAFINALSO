@@ -435,7 +435,7 @@ void nuevoAtendedor(int posEnColaAtendedor) {
 
 //Funcion encargada de hacer que los atendedores atiendan las solicitudes
 void *accionesAtendedor(void *posEnColaAtendedor) {
-        int contadorVecesAtiende = 0, posEnColaSolicitud = 0, porcentaje = 0, flagAtendido = 0, tiempoDeAtencion = 0, posAtendedor = (*(int *)posEnColaAtendedor)+1;
+        int contadorVecesAtiende = 0, posEnColaSolicitud = 0, porcentaje = 0, flagAtendido = 0, tiempoDeAtencion = 0, posAtendedor = (*(int *)posEnColaAtendedor)+1, descanso = 1;
 	pthread_mutex_unlock(&mutexColaAtendedores);
 	char * identificador = (char *) malloc((10 + numeroAtendedores) * sizeof(char));
 	sprintf(identificador, "Atendedor_%d", posAtendedor);
@@ -465,6 +465,8 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 			pthread_mutex_unlock(&mutexColaSolicitudes);
 			contadorVecesAtiende++;
 			if(contadorVecesAtiende == 5) {
+				while(descanso == 1)
+				{
 				contadorVecesAtiende=0;
 				sprintf(evento, "Inicio descanso de 10 segundos.");
 				pthread_mutex_lock(&mutexLog); 
@@ -474,7 +476,9 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 				sprintf(evento, "Fin descanso de 10 segundos.");	
 				pthread_mutex_lock(&mutexLog); 
 				writeLogMessage(identificador, evento);
-				pthread_mutex_unlock(&mutexLog);			
+				pthread_mutex_unlock(&mutexLog);
+				descanso = 0;
+				}	
 			}		
 		}      
    	}
