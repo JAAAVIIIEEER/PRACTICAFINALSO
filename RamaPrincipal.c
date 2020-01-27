@@ -478,7 +478,8 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 				writeLogMessage(identificador, evento);
 				pthread_mutex_unlock(&mutexLog);
 				descanso = 0;
-				}	
+				}
+				descanso = 1;	
 			}		
 		}      
    	}
