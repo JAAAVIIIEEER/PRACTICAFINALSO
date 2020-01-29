@@ -47,7 +47,7 @@ typedef struct {
 Solicitud * colaSolicitudes;
 Social colaSocial[4];
 FILE * logFile;
-int contadorSolicitudes, contadorActividades, finalizar, numeroSolicitudes, numeroAtendedores;
+int contadorSolicitudes, contadorActividades,atendidas,atendiendo, finalizar, numeroSolicitudes, numeroAtendedores;
 
 // Declaración de funciones auxiliares.
 void manejadoraNuevaSolicitud(int sig);
@@ -80,6 +80,8 @@ int main(int argc, char* argv[]) {
 	contadorSolicitudes = 0;
 	contadorActividades = 0;
 	finalizar = 0;
+	atendiendo = 0;
+	atendidas = 0;
 	logFile = NULL;	
 	fopen("registroTiempos.log", "w");
 	
@@ -183,23 +185,20 @@ int main(int argc, char* argv[]) {
 // Función manejadora de la señal SIGPIPE. Dedicada a poder aumentar la cola de solicitudes.
 void manejadoraAumentoSolicitudes(int sig) {
 	int aux = numeroSolicitudes;
-	char * modificadoSolicitudes = (char *)malloc(200 * sizeof(char));
-	
+	char * infoGlobal = (char *)malloc(200 * sizeof(char));
+	int espaciosEnBlanco =0, atendidos = 0;
+	pthread_mutex_unlock(&mutexColaSocial);
 	pthread_mutex_lock(&mutexColaSolicitudes);
-	printf("\033[1;32m");
-	printf("Insertar nuevo numero de solicitudes: \n");
-	printf("\033[0m");
-	scanf("%d",&numeroSolicitudes);
 	colaSolicitudes = (Solicitud *) realloc(colaSolicitudes, numeroSolicitudes*sizeof(Solicitud));
-	for(aux; aux<numeroSolicitudes; aux++){
-		(*(colaSolicitudes + aux)).id = 0;
-		(*(colaSolicitudes + aux)).atendido = 0;
-		(*(colaSolicitudes + aux)).tipo = 0;	
-	}
+	for(aux = 0; aux < numeroSolicitudes; aux++) {
+    			if((*(colaSolicitudes+aux)).id=0){
+				espaciosEnBlanco++;}
+		}
+	sprintf(infoGlobal, "Han sido atendidas %d.\n Estan se estan atendiendo: %d\n Hay estos espacios en blanco: %d\n Usuarios esperando a la actividad social: %d.\n", atendidas, atendiendo, espaciosEnBlanco, contadorActividades);
 	pthread_mutex_unlock(&mutexColaSolicitudes);
-	sprintf(modificadoSolicitudes, "Modificado a %d solicitudes.", numeroSolicitudes);
+	pthread_mutex_unlock(&mutexColaSocial);
 	pthread_mutex_lock(&mutexLog);
-	writeLogMessage("Numero Solicitudes", modificadoSolicitudes);
+	writeLogMessage("Informacion Global", infoGlobal);
 	pthread_mutex_unlock(&mutexLog);
 }
 
@@ -356,7 +355,10 @@ void accionesSolicitud(int posicion){
                          	solicitudTramitadaRechazada(posicion);
 			}
 		//En caso de que este siendo atendida la solicitud              			
-		} else {	
+		} else {
+			pthread_mutex_lock(&mutexColaAtendedores);
+			atendidas++;
+			pthread_mutex_unlock(&mutexColaAtendedores);
 			while((*(colaSolicitudes + posicion)).atendido == 1) {
 				pthread_mutex_unlock(&mutexColaSolicitudes);
 				sleep(1);
@@ -446,6 +448,9 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 		if(posEnColaSolicitud == -1){
 			sleep(1);
 		} else {
+			pthread_mutex_lock(&mutexColaAtendedores);
+			atendiendo++;
+			pthread_mutex_unlock(&mutexColaAtendedores);
 			porcentaje = calculaAleatorios(1, 100);
 			flagAtendido = tipoDeAtencion(porcentaje);
 
@@ -481,7 +486,10 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 				}
 				descanso = 1;	
 			}		
-		}      
+		}
+		pthread_mutex_lock(&mutexColaAtendedores);
+		atendiendo--;     
+		pthread_mutex_lock(&mutexColaAtendedores);
    	}
 	pthread_exit(NULL);
 }
