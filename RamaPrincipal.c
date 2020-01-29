@@ -186,14 +186,15 @@ void manejadoraInfoGeneral(int sig) {
 	int aux;
 	char * infoGlobal = (char *)malloc(200 * sizeof(char));
 	int espaciosEnBlanco =0;
-	pthread_mutex_unlock(&mutexColaSocial);
+	pthread_mutex_lock(&mutexColaSocial);
 	pthread_mutex_lock(&mutexColaSolicitudes);
+
 	for(aux = 0; aux < numeroSolicitudes; aux++) {
 	if((*(colaSolicitudes + aux)).id == 0) {
 		 espaciosEnBlanco++;
 	}
 	}
-	sprintf(infoGlobal, "\n Han sido atendidas: %d.\n Estan se estan atendiendo: %d\n Hay estos espacios en blanco: %d\n Usuarios esperando a la actividad social: %d.\n", atendidas, atendiendo, espaciosEnBlanco, contadorActividades);
+	sprintf(infoGlobal, "\n Han sido atendidas: %d.\n Estan se estan atendiendo: %d.\n Hay estos espacios en blanco: %d.\n Usuarios esperando a la actividad social: %d.\n", atendidas, atendiendo, espaciosEnBlanco, contadorActividades);
 	pthread_mutex_unlock(&mutexColaSolicitudes);
 	pthread_mutex_unlock(&mutexColaSocial);
 	pthread_mutex_lock(&mutexLog);
@@ -243,19 +244,6 @@ void manejadoraAumentoAtendedores(int sig) {
 	}
 	pthread_mutex_unlock(&mutexColaAtendedores);
 }
-/*void prueba(int auxSol){
-	
-	printf("\033[1;32m");
-	printf("Insertar nuevo numero de solicitudes: \n");
-	printf("\033[0m");
-	scanf("%d",&numeroSolicitudes);
-	colaSolicitudes = (Solicitud *) realloc(colaSolicitudes, numeroSolicitudes*sizeof(Solicitud));
-	for(auxSol; auxSol<numeroSolicitudes; auxSol++){
-		(*(colaSolicitudes + auxSol)).id = 0;
-		(*(colaSolicitudes + auxSol)).atendido = 0;
-		(*(colaSolicitudes + auxSol)).tipo = 0;	
-	}
-	}*/
 // Función manejadora de la señal SIGINT.
 void manejadoraTerminar(int sig) {
 	finalizar = 1;
@@ -457,9 +445,9 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 		if(posEnColaSolicitud == -1){
 			sleep(1);
 		} else {
-			pthread_mutex_lock(&mutexColaAtendedores);
+			pthread_mutex_lock(&mutexColaSolicitudes);
 			atendiendo++;
-			pthread_mutex_unlock(&mutexColaAtendedores);
+			pthread_mutex_unlock(&mutexColaSolicitudes);
 			porcentaje = calculaAleatorios(1, 100);
 			flagAtendido = tipoDeAtencion(porcentaje);
 
@@ -494,11 +482,12 @@ void *accionesAtendedor(void *posEnColaAtendedor) {
 				descanso = 0;
 				}
 				descanso = 1;	
-			}		
+			}
+			pthread_mutex_lock(&mutexColaSolicitudes);
+			atendiendo--;     
+			pthread_mutex_unlock(&mutexColaSolicitudes);		
 		}
-		pthread_mutex_lock(&mutexColaAtendedores);
-		atendiendo--;     
-		pthread_mutex_unlock(&mutexColaAtendedores);
+		
    	}
 	pthread_exit(NULL);
 }
